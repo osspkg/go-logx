@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"go.osspkg.com/casecheck"
-	"go.osspkg.com/syncing"
 )
 
 func TestUnit_NewJSON(t *testing.T) {
@@ -26,26 +25,20 @@ func TestUnit_NewJSON(t *testing.T) {
 	SetLevel(LevelDebug)
 	casecheck.Equal(t, LevelDebug, GetLevel())
 
-	go Infof("async %d", 1)
-	go Warnf("async %d", 2)
-	go Errorf("async %d", 3)
-	go Debugf("async %d", 4)
+	go Info("async", "id", 1)
+	go Warn("async", "id", 2)
+	go Error("async", "id", 3)
+	go Debug("async", "id", 4)
 
-	Infof("sync %d", 1)
-	Warnf("sync %d", 2)
-	Errorf("sync %d", 3)
-	Debugf("sync %d", 4)
+	Info("sync", "id", 1)
+	Warn("sync", "id", 2)
+	Error("sync", "id", 3)
+	Debug("sync", "id", 4)
 
-	WithFields(Fields{"ip": "0.0.0.0"}).Infof("context1")
-	WithFields(Fields{"nil": nil}).Infof("context2")
-	WithFields(Fields{"func": func() {}}).Infof("context3")
-
-	WithField("ip", "0.0.0.0").Infof("context4")
-	WithField("nil", nil).Infof("context5")
-	WithField("func", func() {}).Infof("context6")
-
-	WithError("err", nil).Infof("context7")
-	WithError("err", fmt.Errorf("er1")).Infof("context8")
+	Info("context1", "ip", "0.0.0.0")
+	Info("context2", "nil", nil)
+	Info("context3", "func", func() {})
+	Info("context4", "err", fmt.Errorf("er1"))
 
 	<-time.After(time.Second * 1)
 	Close()
@@ -56,21 +49,18 @@ func TestUnit_NewJSON(t *testing.T) {
 	casecheck.NoError(t, os.Remove(filename.Name()))
 
 	sdata := string(data)
-	casecheck.Contains(t, sdata, `"lvl":"INF","msg":"async 1"`)
-	casecheck.Contains(t, sdata, `"lvl":"WRN","msg":"async 2"`)
-	casecheck.Contains(t, sdata, `"lvl":"ERR","msg":"async 3"`)
-	casecheck.Contains(t, sdata, `"lvl":"DBG","msg":"async 4"`)
-	casecheck.Contains(t, sdata, `"lvl":"INF","msg":"sync 1"`)
-	casecheck.Contains(t, sdata, `"lvl":"WRN","msg":"sync 2"`)
-	casecheck.Contains(t, sdata, `"lvl":"ERR","msg":"sync 3"`)
-	casecheck.Contains(t, sdata, `"msg":"context1","ctx":{"ip":"0.0.0.0"}`)
-	casecheck.Contains(t, sdata, `"msg":"context2","ctx":{"nil":null}`)
-	casecheck.Contains(t, sdata, `"msg":"context3","ctx":{"func":"unsupported field value: (func())`)
-	casecheck.Contains(t, sdata, `"msg":"context4","ctx":{"ip":"0.0.0.0"}`)
-	casecheck.Contains(t, sdata, `"msg":"context5","ctx":{"nil":null}`)
-	casecheck.Contains(t, sdata, `"msg":"context6","ctx":{"func":"unsupported field value: (func())`)
-	casecheck.Contains(t, sdata, `"msg":"context7","ctx":{"err":null}`)
-	casecheck.Contains(t, sdata, `"msg":"context8","ctx":{"err":"er1"}`)
+	casecheck.Contains(t, sdata, `"lvl":"INF","msg":"async","ctx":{"id":"1"}`)
+	casecheck.Contains(t, sdata, `"lvl":"WRN","msg":"async","ctx":{"id":"2"}`)
+	casecheck.Contains(t, sdata, `"lvl":"ERR","msg":"async","ctx":{"id":"3"}`)
+	casecheck.Contains(t, sdata, `"lvl":"DBG","msg":"async","ctx":{"id":"4"}`)
+	casecheck.Contains(t, sdata, `"lvl":"INF","msg":"sync","ctx":{"id":"1"}`)
+	casecheck.Contains(t, sdata, `"lvl":"WRN","msg":"sync","ctx":{"id":"2"}`)
+	casecheck.Contains(t, sdata, `"lvl":"ERR","msg":"sync","ctx":{"id":"3"}`)
+	casecheck.Contains(t, sdata, `"lvl":"DBG","msg":"sync","ctx":{"id":"4"}`)
+	casecheck.Contains(t, sdata, `"lvl":"INF","msg":"context1","ctx":{"ip":"0.0.0.0"}`)
+	casecheck.Contains(t, sdata, `"lvl":"INF","msg":"context2","ctx":{"nil":"null"}`)
+	casecheck.Contains(t, sdata, `"lvl":"INF","msg":"context3","ctx":{"func":"(func())(0x`)
+	casecheck.Contains(t, sdata, `"lvl":"INF","msg":"context4","ctx":{"err":"er1"}`)
 }
 
 func TestUnit_NewString(t *testing.T) {
@@ -86,26 +76,20 @@ func TestUnit_NewString(t *testing.T) {
 	l.SetLevel(LevelDebug)
 	casecheck.Equal(t, LevelDebug, l.GetLevel())
 
-	go l.Infof("async %d", 1)
-	go l.Warnf("async %d", 2)
-	go l.Errorf("async %d", 3)
-	go l.Debugf("async %d", 4)
+	go l.Info("async", "id", 1)
+	go l.Warn("async", "id", 2)
+	go l.Error("async", "id", 3)
+	go l.Debug("async", "id", 4)
 
-	l.Infof("sync %d", 1)
-	l.Warnf("sync %d", 2)
-	l.Errorf("sync %d", 3)
-	l.Debugf("sync %d", 4)
+	l.Info("sync", "id", 1)
+	l.Warn("sync", "id", 2)
+	l.Error("sync", "id", 3)
+	l.Debug("sync", "id", 4)
 
-	l.WithFields(Fields{"ip": "0.0.0.0"}).Infof("context1")
-	l.WithFields(Fields{"nil": nil}).Infof("context2")
-	l.WithFields(Fields{"func": func() {}}).Infof("context3")
-
-	l.WithField("ip", "0.0.0.0").Infof("context4")
-	l.WithField("nil", nil).Infof("context5")
-	l.WithField("func", func() {}).Infof("context6")
-
-	l.WithError("err", nil).Infof("context7")
-	l.WithError("err", fmt.Errorf("er1")).Infof("context8")
+	l.Info("context1", "ip", "0.0.0.0\n")
+	l.Info("context2", "nil", nil)
+	l.Info("context3", "func", func() {})
+	l.Info("context4", "err", fmt.Errorf("er1"))
 
 	<-time.After(time.Second * 1)
 	l.Close()
@@ -116,22 +100,18 @@ func TestUnit_NewString(t *testing.T) {
 	casecheck.NoError(t, os.Remove(filename.Name()))
 
 	sdata := string(data)
-	casecheck.Contains(t, sdata, "lvl=INF	msg=\"async 1\"")
-	casecheck.Contains(t, sdata, "lvl=WRN	msg=\"async 2\"")
-	casecheck.Contains(t, sdata, "lvl=ERR	msg=\"async 3\"")
-	casecheck.Contains(t, sdata, "lvl=DBG	msg=\"async 4\"")
-	casecheck.Contains(t, sdata, "lvl=INF	msg=\"sync 1\"")
-	casecheck.Contains(t, sdata, "lvl=WRN	msg=\"sync 2\"")
-	casecheck.Contains(t, sdata, "lvl=ERR	msg=\"sync 3\"")
-	casecheck.Contains(t, sdata, "lvl=DBG	msg=\"sync 4\"")
-	casecheck.Contains(t, sdata, "lvl=INF	msg=\"context1\"	ip=\"0.0.0.0\"")
-	casecheck.Contains(t, sdata, "lvl=INF	msg=\"context2\"	nil=<nil>")
-	casecheck.Contains(t, sdata, "lvl=INF	msg=\"context3\"	func=\"unsupported field value: (func())(0x")
-	casecheck.Contains(t, sdata, "lvl=INF	msg=\"context4\"	ip=\"0.0.0.0\"")
-	casecheck.Contains(t, sdata, "lvl=INF	msg=\"context5\"	nil=<nil>")
-	casecheck.Contains(t, sdata, "lvl=INF	msg=\"context6\"	func=\"unsupported field value: (func())(0x")
-	casecheck.Contains(t, sdata, "lvl=INF	msg=\"context7\"	err=<nil>")
-	casecheck.Contains(t, sdata, "lvl=INF	msg=\"context8\"	err=\"er1\"")
+	casecheck.Contains(t, sdata, "lvl=INF\tmsg=\"async\"\tid=\"1\"")
+	casecheck.Contains(t, sdata, "lvl=WRN\tmsg=\"async\"\tid=\"2\"")
+	casecheck.Contains(t, sdata, "lvl=ERR\tmsg=\"async\"\tid=\"3\"")
+	casecheck.Contains(t, sdata, "lvl=DBG\tmsg=\"async\"\tid=\"4\"")
+	casecheck.Contains(t, sdata, "lvl=INF\tmsg=\"sync\"\tid=\"1\"")
+	casecheck.Contains(t, sdata, "lvl=WRN\tmsg=\"sync\"\tid=\"2\"")
+	casecheck.Contains(t, sdata, "lvl=ERR\tmsg=\"sync\"\tid=\"3\"")
+	casecheck.Contains(t, sdata, "lvl=DBG\tmsg=\"sync\"\tid=\"4\"")
+	casecheck.Contains(t, sdata, "lvl=INF\tmsg=\"context1\"\tip=\"0.0.0.0\\n\"")
+	casecheck.Contains(t, sdata, "lvl=INF\tmsg=\"context2\"\tnil=\"null\"")
+	casecheck.Contains(t, sdata, "lvl=INF\tmsg=\"context3\"\tfunc=\"(func())(0x")
+	casecheck.Contains(t, sdata, "lvl=INF\tmsg=\"context4\"\terr=\"er1\"")
 }
 
 func BenchmarkNewJSON(b *testing.B) {
@@ -141,19 +121,13 @@ func BenchmarkNewJSON(b *testing.B) {
 	ll.SetOutput(io.Discard)
 	ll.SetLevel(LevelDebug)
 	ll.SetFormatter(NewFormatJSON())
-	wg := syncing.NewGroup()
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			wg.Background(func() {
-				ll.WithFields(Fields{"a": "b"}).Infof("hello")
-				ll.WithField("a", "b").Infof("hello")
-				ll.WithError("a", fmt.Errorf("b")).Infof("hello")
-			})
+			ll.Info("sync", "id", 1)
 		}
 	})
-	wg.Wait()
 	ll.Close()
 }
 
@@ -164,18 +138,12 @@ func BenchmarkNewString(b *testing.B) {
 	ll.SetOutput(io.Discard)
 	ll.SetLevel(LevelDebug)
 	ll.SetFormatter(NewFormatString())
-	wg := syncing.NewGroup()
 
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			wg.Background(func() {
-				ll.WithFields(Fields{"a": "b"}).Infof("hello")
-				ll.WithField("a", "b").Infof("hello")
-				ll.WithError("a", fmt.Errorf("b")).Infof("hello")
-			})
+			ll.Info("sync", "id", 1)
 		}
 	})
-	wg.Wait()
 	ll.Close()
 }

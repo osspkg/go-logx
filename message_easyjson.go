@@ -37,7 +37,9 @@ func easyjson4086215fDecodeGoOsspkgComLogx(in *jlexer.Lexer, out *Message) {
 		}
 		switch key {
 		case "time":
-			out.UnixTime = int64(in.Int64())
+			if data := in.Raw(); in.Ok() {
+				in.AddError((out.Time).UnmarshalJSON(data))
+			}
 		case "lvl":
 			out.Level = string(in.String())
 		case "msg":
@@ -48,22 +50,16 @@ func easyjson4086215fDecodeGoOsspkgComLogx(in *jlexer.Lexer, out *Message) {
 			} else {
 				in.Delim('{')
 				if !in.IsDelim('}') {
-					out.Ctx = make(map[string]interface{})
+					out.Map = make(map[string]string)
 				} else {
-					out.Ctx = nil
+					out.Map = nil
 				}
 				for !in.IsDelim('}') {
 					key := string(in.String())
 					in.WantColon()
-					var v1 interface{}
-					if m, ok := v1.(easyjson.Unmarshaler); ok {
-						m.UnmarshalEasyJSON(in)
-					} else if m, ok := v1.(json.Unmarshaler); ok {
-						_ = m.UnmarshalJSON(in.Raw())
-					} else {
-						v1 = in.Interface()
-					}
-					(out.Ctx)[key] = v1
+					var v1 string
+					v1 = string(in.String())
+					(out.Map)[key] = v1
 					in.WantComma()
 				}
 				in.Delim('}')
@@ -85,7 +81,7 @@ func easyjson4086215fEncodeGoOsspkgComLogx(out *jwriter.Writer, in Message) {
 	{
 		const prefix string = ",\"time\":"
 		out.RawString(prefix[1:])
-		out.Int64(int64(in.UnixTime))
+		out.Raw((in.Time).MarshalJSON())
 	}
 	{
 		const prefix string = ",\"lvl\":"
@@ -97,13 +93,13 @@ func easyjson4086215fEncodeGoOsspkgComLogx(out *jwriter.Writer, in Message) {
 		out.RawString(prefix)
 		out.String(string(in.Message))
 	}
-	if len(in.Ctx) != 0 {
+	if len(in.Map) != 0 {
 		const prefix string = ",\"ctx\":"
 		out.RawString(prefix)
 		{
 			out.RawByte('{')
 			v2First := true
-			for v2Name, v2Value := range in.Ctx {
+			for v2Name, v2Value := range in.Map {
 				if v2First {
 					v2First = false
 				} else {
@@ -111,13 +107,7 @@ func easyjson4086215fEncodeGoOsspkgComLogx(out *jwriter.Writer, in Message) {
 				}
 				out.String(string(v2Name))
 				out.RawByte(':')
-				if m, ok := v2Value.(easyjson.Marshaler); ok {
-					m.MarshalEasyJSON(out)
-				} else if m, ok := v2Value.(json.Marshaler); ok {
-					out.Raw(m.MarshalJSON())
-				} else {
-					out.Raw(json.Marshal(v2Value))
-				}
+				out.String(string(v2Value))
 			}
 			out.RawByte('}')
 		}

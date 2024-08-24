@@ -8,7 +8,6 @@ package logx
 import (
 	"io"
 	"os"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -17,29 +16,25 @@ import (
 
 // log base model
 type log struct {
-	status    uint32
+	level     uint32
 	writer    io.Writer
-	entities  sync.Pool
 	formatter Formatter
 	channel   chan []byte
 	mux       syncing.Lock
 	wg        syncing.Group
+	closed    bool
 }
 
 // New init new logger
 func New() Logger {
 	object := &log{
-		status:    LevelError,
+		level:     LevelError,
 		writer:    os.Stdout,
 		formatter: NewFormatJSON(),
-		channel:   make(chan []byte, 1024),
-		wg:        syncing.NewGroup(),
+		channel:   make(chan []byte, 100000),
 		mux:       syncing.NewLock(),
-	}
-	object.entities = sync.Pool{
-		New: func() interface{} {
-			return newEntity(object)
-		},
+		wg:        syncing.NewGroup(),
+		closed:    false,
 	}
 	object.wg.Background(func() {
 		object.queue()
@@ -52,19 +47,24 @@ func (l *log) SendMessage(level uint32, call func(v *Message)) {
 		return
 	}
 
-	m, ok := poolMessage.Get().(*Message)
-	if !ok {
-		m = &Message{}
-	}
+	m := poolMessage.Get()
+	defer func() {
+		poolMessage.Put(m)
+	}()
 
 	call(m)
+
 	lvl, ok := levels[level]
 	if !ok {
 		lvl = "UNK"
 	}
-	m.Level, m.UnixTime = lvl, time.Now().Unix()
+	m.Level, m.Time = lvl, time.Now()
 
 	l.mux.RLock(func() {
+		if l.closed {
+			return
+		}
+
 		b, err := l.formatter.Encode(m)
 		if err != nil {
 			b = []byte(err.Error())
@@ -75,42 +75,22 @@ func (l *log) SendMessage(level uint32, call func(v *Message)) {
 		default:
 		}
 	})
-
-	m.Reset()
-	poolMessage.Put(m)
 }
 
 func (l *log) queue() {
-	for {
-		b, ok := <-l.channel
-		if !ok {
-			return
-		}
-		if b == nil {
-			return
-		}
+	for b := range l.channel {
 		l.mux.RLock(func() {
 			l.writer.Write(b) //nolint:errcheck
 		})
 	}
 }
 
-func (l *log) getEntity() *entity {
-	lw, ok := l.entities.Get().(*entity)
-	if !ok {
-		lw = newEntity(l)
-	}
-	return lw
-}
-
-func (l *log) PutEntity(v *entity) {
-	v.Reset()
-	l.entities.Put(v)
-}
-
 // Close waiting for all messages to finish recording
 func (l *log) Close() {
-	l.channel <- nil
+	l.mux.Lock(func() {
+		l.closed = true
+		close(l.channel)
+	})
 	l.wg.Wait()
 }
 
@@ -129,50 +109,47 @@ func (l *log) SetFormatter(f Formatter) {
 
 // SetLevel change log level
 func (l *log) SetLevel(v uint32) {
-	atomic.StoreUint32(&l.status, v)
+	atomic.StoreUint32(&l.level, v)
 }
 
 // GetLevel getting log level
 func (l *log) GetLevel() uint32 {
-	return atomic.LoadUint32(&l.status)
+	return atomic.LoadUint32(&l.level)
 }
 
-// Infof info message
-func (l *log) Infof(format string, args ...interface{}) {
-	l.getEntity().Infof(format, args...)
+func (l *log) Info(message string, args ...interface{}) {
+	l.SendMessage(LevelInfo, func(v *Message) {
+		v.Message = message
+		v.Ctx = append(v.Ctx, args...)
+	})
 }
 
-// Warnf warning message
-func (l *log) Warnf(format string, args ...interface{}) {
-	l.getEntity().Warnf(format, args...)
+func (l *log) Warn(message string, args ...interface{}) {
+	l.SendMessage(LevelWarn, func(v *Message) {
+		v.Message = message
+		v.Ctx = append(v.Ctx, args...)
+	})
 }
 
-// Errorf error message
-func (l *log) Errorf(format string, args ...interface{}) {
-	l.getEntity().Errorf(format, args...)
+func (l *log) Error(message string, args ...interface{}) {
+	l.SendMessage(LevelError, func(v *Message) {
+		v.Message = message
+		v.Ctx = append(v.Ctx, args...)
+	})
 }
 
-// Debugf debug message
-func (l *log) Debugf(format string, args ...interface{}) {
-	l.getEntity().Debugf(format, args...)
+func (l *log) Debug(message string, args ...interface{}) {
+	l.SendMessage(LevelDebug, func(v *Message) {
+		v.Message = message
+		v.Ctx = append(v.Ctx, args...)
+	})
 }
 
-// Fatalf fatal message and exit
-func (l *log) Fatalf(format string, args ...interface{}) {
-	l.getEntity().Fatalf(format, args...)
-}
-
-// WithFields setter context to log message
-func (l *log) WithFields(v Fields) Writer {
-	return l.getEntity().WithFields(v)
-}
-
-// WithError setter context to log message
-func (l *log) WithError(key string, err error) Writer {
-	return l.getEntity().WithError(key, err)
-}
-
-// WithField setter context to log message
-func (l *log) WithField(key string, value interface{}) Writer {
-	return l.getEntity().WithField(key, value)
+func (l *log) Fatal(message string, args ...interface{}) {
+	l.SendMessage(levelFatal, func(v *Message) {
+		v.Message = message
+		v.Ctx = append(v.Ctx, args...)
+	})
+	l.Close()
+	os.Exit(1)
 }

@@ -9,13 +9,19 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"sync"
+	"strings"
 	"time"
+
+	"go.osspkg.com/ioutils/pool"
 )
 
 type Formatter interface {
 	Encode(m *Message) ([]byte, error)
 }
+
+var newLine = []byte("\n")
+
+// //////////////////////////////////////////////////////////////////////////////
 
 type FormatJSON struct{}
 
@@ -24,6 +30,7 @@ func NewFormatJSON() *FormatJSON {
 }
 
 func (*FormatJSON) Encode(m *Message) ([]byte, error) {
+	m.CtxToMap()
 	b, err := json.Marshal(m)
 	if err != nil {
 		return nil, err
@@ -31,15 +38,11 @@ func (*FormatJSON) Encode(m *Message) ([]byte, error) {
 	return append(b, '\n'), nil
 }
 
-var poolBuff = sync.Pool{
-	New: func() interface{} {
-		return newBuff()
-	},
-}
+// //////////////////////////////////////////////////////////////////////////////
 
-func newBuff() *bytes.Buffer {
-	return bytes.NewBuffer(nil)
-}
+var poolBuff = pool.New[*bytes.Buffer](func() *bytes.Buffer {
+	return bytes.NewBuffer(make([]byte, 0, 1024))
+})
 
 type FormatString struct {
 	delim string
@@ -54,25 +57,43 @@ func (v *FormatString) SetDelimiter(d string) {
 }
 
 func (v *FormatString) Encode(m *Message) ([]byte, error) {
-	b, ok := poolBuff.Get().(*bytes.Buffer)
-	if !ok {
-		b = newBuff()
-	}
-
+	buff := poolBuff.Get()
 	defer func() {
-		b.Reset()
-		poolBuff.Put(b)
+		poolBuff.Put(buff)
 	}()
 
-	fmt.Fprintf(b, "time=%s%slvl=%s%smsg=%#v",
-		time.Unix(m.UnixTime, 0).Format(time.RFC3339),
-		v.delim, m.Level, v.delim, m.Message)
-	if len(m.Ctx) > 0 {
-		for key, value := range m.Ctx {
-			fmt.Fprintf(b, "%s%s=%#v", v.delim, key, value)
+	fmt.Fprintf(buff, "time=%s%slvl=%s%smsg=%#v",
+		m.Time.Format(time.RFC3339), v.delim, m.Level, v.delim, m.Message)
+
+	if count := len(m.Ctx); count > 0 {
+		if count%2 != 0 {
+			m.Ctx = append(m.Ctx, nil)
+			count++
+		}
+		for i := 0; i < count; i = i + 2 {
+			fmt.Fprintf(buff, "%s%s=\"%s\"", v.delim, typing(m.Ctx[i]), typing(m.Ctx[i+1]))
 		}
 	}
-	b.WriteString("\n")
+	buff.Write(newLine)
 
-	return append(make([]byte, 0, b.Len()), b.Bytes()...), nil
+	return append(make([]byte, 0, buff.Len()), buff.Bytes()...), nil
+}
+
+func typing(v interface{}) (s string) {
+	if v == nil {
+		s = "null"
+		return
+	}
+	switch vv := v.(type) {
+	case error:
+		s = vv.Error()
+	case fmt.GoStringer:
+		s = vv.GoString()
+	case fmt.Stringer:
+		s = vv.String()
+	default:
+		s = fmt.Sprintf("%#v", v)
+	}
+	s = strings.Trim(s, "\"")
+	return
 }
