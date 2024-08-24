@@ -8,6 +8,7 @@ package logx
 import (
 	"bytes"
 	"testing"
+	"time"
 )
 
 func TestUnit_FormatString_Encode(t *testing.T) {
@@ -20,11 +21,11 @@ func TestUnit_FormatString_Encode(t *testing.T) {
 		{
 			name: "Case1",
 			args: &Message{
-				UnixTime: 123456789,
-				Level:    "INF",
-				Message:  "Hello",
-				Ctx: map[string]interface{}{
-					"err": "err\nmsg",
+				Time:    time.Now(),
+				Level:   "INF",
+				Message: "Hello",
+				Ctx: []interface{}{
+					"err", "err\nmsg",
 				},
 			},
 			want:    []byte("lvl=INF\tmsg=\"Hello\"\terr=\"err\\nmsg\"\n"),

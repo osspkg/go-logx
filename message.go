@@ -5,35 +5,52 @@
 
 package logx
 
-import "sync"
+import (
+	"time"
+
+	"go.osspkg.com/ioutils/pool"
+)
 
 //go:generate easyjson
 
-var poolMessage = sync.Pool{
-	New: func() interface{} {
-		return newMessage()
-	},
-}
+var poolMessage = pool.New[*Message](func() *Message {
+	return newMessage()
+})
 
 //easyjson:json
 type Message struct {
-	UnixTime int64                  `json:"time" yaml:"time"`
-	Level    string                 `json:"lvl" yaml:"lvl"`
-	Message  string                 `json:"msg" yaml:"msg"`
-	Ctx      map[string]interface{} `json:"ctx,omitempty" yaml:"ctx,omitempty,inline"`
+	Time    time.Time         `json:"time" yaml:"time"`
+	Level   string            `json:"lvl" yaml:"lvl"`
+	Message string            `json:"msg" yaml:"msg"`
+	Ctx     []interface{}     `json:"-"`
+	Map     map[string]string `json:"ctx,omitempty" yaml:"ctx,omitempty,inline"`
 }
 
 func newMessage() *Message {
 	return &Message{
-		Ctx: make(map[string]interface{}, 2),
+		Ctx: make([]interface{}, 0, 10),
+		Map: make(map[string]string, 10),
 	}
 }
 
 func (v *Message) Reset() {
-	v.UnixTime = 0
-	v.Level = ""
-	v.Message = ""
-	for s := range v.Ctx {
-		delete(v.Ctx, s)
+	v.Ctx = v.Ctx[:0]
+	for k := range v.Map {
+		delete(v.Map, k)
 	}
+}
+
+func (v *Message) CtxToMap() {
+	count := len(v.Ctx)
+	if count == 0 {
+		return
+	}
+	if count%2 != 0 {
+		v.Ctx = append(v.Ctx, nil)
+		count++
+	}
+	for i := 0; i < count; i = i + 2 {
+		v.Map[typing(v.Ctx[i])] = typing(v.Ctx[i+1])
+	}
+	v.Ctx = v.Ctx[:0]
 }
