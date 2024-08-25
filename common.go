@@ -16,25 +16,11 @@ const (
 )
 
 var levels = map[uint32]string{
-	levelFatal: "FAT",
-	LevelError: "ERR",
-	LevelWarn:  "WRN",
-	LevelInfo:  "INF",
-	LevelDebug: "DBG",
-}
-
-type Sender interface {
-	SendMessage(level uint32, call func(v *Message))
-	Close()
-}
-
-// Writer interface
-type Writer interface {
-	Fatal(format string, args ...interface{})
-	Error(format string, args ...interface{})
-	Warn(format string, args ...interface{})
-	Info(format string, args ...interface{})
-	Debug(format string, args ...interface{})
+	levelFatal: "FATAL",
+	LevelError: "ERROR",
+	LevelWarn:  "WARN",
+	LevelInfo:  "INFO",
+	LevelDebug: "DEBUG",
 }
 
 // Logger base interface
@@ -42,8 +28,10 @@ type Logger interface {
 	SetOutput(out io.Writer)
 	SetFormatter(f Formatter)
 	SetLevel(v uint32)
-	GetLevel() uint32
-	Close()
 
-	Writer
+	Fatal(message string, args ...interface{})
+	Error(message string, args ...interface{})
+	Warn(message string, args ...interface{})
+	Info(message string, args ...interface{})
+	Debug(message string, args ...interface{})
 }

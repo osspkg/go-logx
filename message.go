@@ -20,7 +20,7 @@ var poolMessage = pool.New[*Message](func() *Message {
 //easyjson:json
 type Message struct {
 	Time    time.Time         `json:"time" yaml:"time"`
-	Level   string            `json:"lvl" yaml:"lvl"`
+	Level   string            `json:"level" yaml:"level"`
 	Message string            `json:"msg" yaml:"msg"`
 	Ctx     []interface{}     `json:"-"`
 	Map     map[string]string `json:"ctx,omitempty" yaml:"ctx,omitempty,inline"`

@@ -5,9 +5,15 @@
 
 package logx
 
-import "io"
+import (
+	"io"
+)
 
-var std = New()
+var std Logger = New()
+
+func SetDefault(log Logger) {
+	std = log
+}
 
 // Default logger
 func Default() Logger {
@@ -23,19 +29,9 @@ func SetFormatter(f Formatter) {
 	std.SetFormatter(f)
 }
 
-// SetLevel change log level
+// SetLevel change Log level
 func SetLevel(v uint32) {
 	std.SetLevel(v)
-}
-
-// GetLevel getting log level
-func GetLevel() uint32 {
-	return std.GetLevel()
-}
-
-// Close waiting for all messages to finish recording
-func Close() {
-	std.Close()
 }
 
 // Info message
