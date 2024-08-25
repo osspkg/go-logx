@@ -3,24 +3,26 @@
  *  Use of this source code is governed by a BSD 3-Clause license that can be found in the LICENSE file.
  */
 
-package logx
+package logx_test
 
 import (
 	"bytes"
 	"testing"
 	"time"
+
+	"go.osspkg.com/logx"
 )
 
 func TestUnit_FormatString_Encode(t *testing.T) {
 	tests := []struct {
 		name    string
-		args    *Message
+		args    *logx.Message
 		want    []byte
 		wantErr bool
 	}{
 		{
 			name: "Case1",
-			args: &Message{
+			args: &logx.Message{
 				Time:    time.Now(),
 				Level:   "INF",
 				Message: "Hello",
@@ -28,18 +30,20 @@ func TestUnit_FormatString_Encode(t *testing.T) {
 					"err", "err\nmsg",
 				},
 			},
-			want:    []byte("lvl=INF\tmsg=\"Hello\"\terr=\"err\\nmsg\"\n"),
+			want:    []byte("\"level\"=\"INF\"\t\"msg\"=\"Hello\"\t\"err\"=\"err\\nmsg\""),
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fo := NewFormatString()
-			got, err := fo.Encode(tt.args)
+			var w bytes.Buffer
+			fo := logx.NewFormatString()
+			err := fo.Encode(&w, tt.args)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Encode() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+			got := w.Bytes()
 			if !bytes.Contains(got, tt.want) {
 				t.Errorf("Encode() got = %v, want %v", string(got), string(tt.want))
 			}

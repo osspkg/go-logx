@@ -40,7 +40,7 @@ func easyjson4086215fDecodeGoOsspkgComLogx(in *jlexer.Lexer, out *Message) {
 			if data := in.Raw(); in.Ok() {
 				in.AddError((out.Time).UnmarshalJSON(data))
 			}
-		case "lvl":
+		case "level":
 			out.Level = string(in.String())
 		case "msg":
 			out.Message = string(in.String())
@@ -84,7 +84,7 @@ func easyjson4086215fEncodeGoOsspkgComLogx(out *jwriter.Writer, in Message) {
 		out.Raw((in.Time).MarshalJSON())
 	}
 	{
-		const prefix string = ",\"lvl\":"
+		const prefix string = ",\"level\":"
 		out.RawString(prefix)
 		out.String(string(in.Level))
 	}
