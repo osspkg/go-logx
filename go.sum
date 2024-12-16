@@ -4,7 +4,7 @@ github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0
 github.com/mailru/easyjson v0.7.7/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
 go.osspkg.com/casecheck v0.3.0 h1:x15blEszElbrHrEH5H02JIIhGIg/lGZzIt1kQlD3pwM=
 go.osspkg.com/casecheck v0.3.0/go.mod h1:TRFXDMFJEOtnlp3ET2Hix3osbxwPWhvaiT/HfD3+gBA=
-go.osspkg.com/ioutils v0.4.7 h1:ERr37BhApkVH34Ebq2yPY+50p38bElSns6pX64wVsyw=
-go.osspkg.com/ioutils v0.4.7/go.mod h1:58HhG2NHf9JUtixAH3R2XISlUmJruwVIUZ3039QVjOY=
+go.osspkg.com/ioutils v0.4.8 h1:7o7n6eypWdu3EF8i/ocnuyqDtYXJUqds+Chd1XmZp5s=
+go.osspkg.com/ioutils v0.4.8/go.mod h1:58HhG2NHf9JUtixAH3R2XISlUmJruwVIUZ3039QVjOY=
 go.osspkg.com/syncing v0.3.0 h1:yBkCsDPEt12a+qagInFFt7+ZongfT+GjSQl7nBmcybI=
 go.osspkg.com/syncing v0.3.0/go.mod h1:Dpe0ljlEG6cI2Y9PxEjKiYEX2sgs1eUjWNVjFu4/iB0=
