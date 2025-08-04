@@ -10,6 +10,8 @@
 *.db-wal
 *.db-journal
 *.dev.yaml
+*.mmdb
+.env
 
 .idea/
 .vscode/
@@ -21,3 +23,4 @@ coverage.out
 bin/
 vendor/
 build/
+

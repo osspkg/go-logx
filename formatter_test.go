@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2024 Mikhail Knyazhev <markus621@yandex.ru>. All rights reserved.
+ *  Copyright (c) 2024-2025 Mikhail Knyazhev <markus621@yandex.ru>. All rights reserved.
  *  Use of this source code is governed by a BSD 3-Clause license that can be found in the LICENSE file.
  */
 
@@ -9,6 +9,8 @@ import (
 	"bytes"
 	"testing"
 	"time"
+
+	"go.osspkg.com/casecheck"
 
 	"go.osspkg.com/logx"
 )
@@ -49,4 +51,26 @@ func TestUnit_FormatString_Encode(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnit_debug(t *testing.T) {
+	var w bytes.Buffer
+	fj := logx.NewFormatJSON()
+	fj.Encode(&w, &logx.Message{})
+	fj.Encode(&w, &logx.Message{})
+	fj.Encode(&w, &logx.Message{})
+
+	fs := logx.NewFormatString()
+	fs.Encode(&w, &logx.Message{Ctx: []any{"a\na", "a\nb\n"}})
+	fs.Encode(&w, &logx.Message{Message: "a\nb\n"})
+
+	result := string(w.Bytes())
+	wait := `{"time":"0001-01-01T00:00:00Z","level":"","msg":""}
+{"time":"0001-01-01T00:00:00Z","level":"","msg":""}
+{"time":"0001-01-01T00:00:00Z","level":"","msg":""}
+"time"="0001-01-01T00:00:00Z"	"level"=""	"msg"=""	"a\na"="a\nb\n"	
+"time"="0001-01-01T00:00:00Z"	"level"=""	"msg"="a\nb\n"	
+`
+
+	casecheck.Equal(t, result, wait)
 }

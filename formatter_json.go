@@ -1,3 +1,8 @@
+/*
+ *  Copyright (c) 2024-2025 Mikhail Knyazhev <markus621@yandex.ru>. All rights reserved.
+ *  Use of this source code is governed by a BSD 3-Clause license that can be found in the LICENSE file.
+ */
+
 package logx
 
 import (
@@ -6,6 +11,7 @@ import (
 	"fmt"
 	"io"
 
+	"go.osspkg.com/ioutils/data"
 	"go.osspkg.com/ioutils/pool"
 )
 
@@ -26,23 +32,38 @@ func (*FormatJSON) Encode(out io.Writer, m *Message) error {
 	if err := w.Encoder.Encode(m); err != nil {
 		return fmt.Errorf("logx json encode: %w", err)
 	}
-	w.Buffer.Write(newLine)
+
+	if _, err := w.Buffer.Seek(-1, io.SeekEnd); err != nil {
+		return fmt.Errorf("logx json seek: %w", err)
+	}
+
+	if b := w.Buffer.Next(1); !bytes.Equal(b, newLine) {
+		if _, err := w.Buffer.Write(newLine); err != nil {
+			return fmt.Errorf("logx json write new line: %w", err)
+		}
+	}
+
+	if _, err := w.Buffer.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("logx json seek: %w", err)
+	}
+
 	if _, err := w.Buffer.WriteTo(out); err != nil {
 		return fmt.Errorf("logx json write: %w", err)
 	}
+
 	return nil
 }
 
 var poolJson = pool.New[*jsonWriter](func() *jsonWriter {
 	obj := &jsonWriter{
-		Buffer: bytes.NewBuffer(nil),
+		Buffer: data.NewBuffer(1024),
 	}
 	obj.Encoder = json.NewEncoder(obj.Buffer)
 	return obj
 })
 
 type jsonWriter struct {
-	Buffer  *bytes.Buffer
+	Buffer  *data.Buffer
 	Encoder *json.Encoder
 }
 
