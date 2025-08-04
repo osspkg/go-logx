@@ -1,3 +1,8 @@
+/*
+ *  Copyright (c) 2024-2025 Mikhail Knyazhev <markus621@yandex.ru>. All rights reserved.
+ *  Use of this source code is governed by a BSD 3-Clause license that can be found in the LICENSE file.
+ */
+
 package logx
 
 import (
@@ -55,21 +60,22 @@ func (v *FormatString) Encode(out io.Writer, m *Message) error {
 	return nil
 }
 
-func typing(v interface{}) (s string) {
+func typing(v interface{}) string {
 	if v == nil {
-		s = "null"
-		return
+		return "null"
 	}
 	switch vv := v.(type) {
 	case error:
-		s = vv.Error()
+		v = vv.Error()
 	case fmt.GoStringer:
-		s = vv.GoString()
+		v = vv.GoString()
 	case fmt.Stringer:
-		s = vv.String()
+		v = vv.String()
+	case []byte:
+		v = string(vv)
 	default:
-		s = fmt.Sprintf("%#v", v)
 	}
-	s = strings.Trim(s, "\"")
-	return
+
+	s := fmt.Sprintf("%#v", v)
+	return strings.Trim(s, "\"")
 }
