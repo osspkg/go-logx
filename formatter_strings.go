@@ -6,11 +6,13 @@
 package logx
 
 import (
-	"bytes"
+	"encoding"
 	"fmt"
 	"io"
 	"strings"
 	"time"
+
+	"go.osspkg.com/ioutils/data"
 )
 
 type FormatString struct {
@@ -25,13 +27,13 @@ func (v *FormatString) SetDelimiter(d byte) {
 	v.delim = d
 }
 
-func (v *FormatString) write(w *bytes.Buffer, key, value interface{}) {
-	w.WriteByte('"')
-	w.WriteString(typing(key))
-	w.WriteString("\"=\"")
-	w.WriteString(typing(value))
-	w.WriteByte('"')
-	w.WriteByte(v.delim)
+func (v *FormatString) write(w *data.Buffer, key, value interface{}) {
+	w.WriteByte('"')             //nolint:errcheck
+	w.WriteString(typing(key))   //nolint:errcheck
+	w.WriteString("\"=\"")       //nolint:errcheck
+	w.WriteString(typing(value)) //nolint:errcheck
+	w.WriteByte('"')             //nolint:errcheck
+	w.WriteByte(v.delim)         //nolint:errcheck
 }
 
 func (v *FormatString) Encode(out io.Writer, m *Message) error {
@@ -53,7 +55,7 @@ func (v *FormatString) Encode(out io.Writer, m *Message) error {
 			v.write(w, m.Ctx[i], m.Ctx[i+1])
 		}
 	}
-	w.Write(newLine)
+	w.Write(newLine) //nolint:errcheck
 	if _, err := w.WriteTo(out); err != nil {
 		return fmt.Errorf("logx string write: %w", err)
 	}
@@ -71,6 +73,14 @@ func typing(v interface{}) string {
 		v = vv.GoString()
 	case fmt.Stringer:
 		v = vv.String()
+	case encoding.TextMarshaler:
+		if b, err := vv.MarshalText(); err == nil {
+			v = string(b)
+		}
+	case encoding.BinaryMarshaler:
+		if b, err := vv.MarshalBinary(); err == nil {
+			v = string(b)
+		}
 	case []byte:
 		v = string(vv)
 	default:

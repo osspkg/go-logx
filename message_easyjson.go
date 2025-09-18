@@ -31,20 +31,27 @@ func easyjson4086215fDecodeGoOsspkgComLogx(in *jlexer.Lexer, out *Message) {
 	for !in.IsDelim('}') {
 		key := in.UnsafeFieldName(false)
 		in.WantColon()
-		if in.IsNull() {
-			in.Skip()
-			in.WantComma()
-			continue
-		}
 		switch key {
 		case "time":
-			if data := in.Raw(); in.Ok() {
-				in.AddError((out.Time).UnmarshalJSON(data))
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				if data := in.Raw(); in.Ok() {
+					in.AddError((out.Time).UnmarshalJSON(data))
+				}
 			}
 		case "level":
-			out.Level = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Level = string(in.String())
+			}
 		case "msg":
-			out.Message = string(in.String())
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				out.Message = string(in.String())
+			}
 		case "ctx":
 			if in.IsNull() {
 				in.Skip()
@@ -59,7 +66,11 @@ func easyjson4086215fDecodeGoOsspkgComLogx(in *jlexer.Lexer, out *Message) {
 					key := string(in.String())
 					in.WantColon()
 					var v1 string
-					v1 = string(in.String())
+					if in.IsNull() {
+						in.Skip()
+					} else {
+						v1 = string(in.String())
+					}
 					(out.Map)[key] = v1
 					in.WantComma()
 				}

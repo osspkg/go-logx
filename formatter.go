@@ -6,16 +6,16 @@
 package logx
 
 import (
-	"bytes"
 	"io"
 
+	"go.osspkg.com/ioutils/data"
 	"go.osspkg.com/ioutils/pool"
 )
 
 var newLine = []byte("\n")
 
-var poolBuffer = pool.New[*bytes.Buffer](func() *bytes.Buffer {
-	return bytes.NewBuffer(make([]byte, 0, 1024))
+var poolBuffer = pool.New[*data.Buffer](func() *data.Buffer {
+	return data.NewBuffer(1024)
 })
 
 type Formatter interface {

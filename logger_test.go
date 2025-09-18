@@ -7,6 +7,7 @@ package logx_test
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -21,6 +22,11 @@ import (
 type mockWriter struct {
 	b *bytes.Buffer
 	l sync.Mutex
+}
+
+type testData struct {
+	A string
+	B int
 }
 
 func newMockWriter() *mockWriter {
@@ -45,16 +51,16 @@ func (v *mockWriter) String() string {
 func TestUnit_NewJSON(t *testing.T) {
 	casecheck.NotNil(t, logx.Default())
 
-	wg := syncing.NewGroup()
+	wg := syncing.NewGroup(context.TODO())
 	buff := newMockWriter()
 
 	logx.SetOutput(buff)
 	logx.SetLevel(logx.LevelDebug)
 
-	wg.Background(func() { logx.Info("async", "id", 1) })
-	wg.Background(func() { logx.Warn("async", "id", 2) })
-	wg.Background(func() { logx.Error("async", "id", 3) })
-	wg.Background(func() { logx.Debug("async", "id", 4) })
+	wg.Background("", func(_ context.Context) { logx.Info("async", "id", 1) })
+	wg.Background("", func(_ context.Context) { logx.Warn("async", "id", 2) })
+	wg.Background("", func(_ context.Context) { logx.Error("async", "id", 3) })
+	wg.Background("", func(_ context.Context) { logx.Debug("async", "id", 4) })
 
 	logx.Info("sync", "id", 1)
 	logx.Warn("sync", "id", 2)
@@ -65,6 +71,7 @@ func TestUnit_NewJSON(t *testing.T) {
 	logx.Info("context2", "nil", nil)
 	logx.Info("context3", "func", func() {})
 	logx.Info("context4", "err", fmt.Errorf("er1"))
+	logx.Info("context5", "obj", testData{})
 
 	wg.Wait()
 
@@ -81,10 +88,11 @@ func TestUnit_NewJSON(t *testing.T) {
 	casecheck.Contains(t, data, `"level":"INFO","msg":"context2","ctx":{"nil":"null"}`)
 	casecheck.Contains(t, data, `"level":"INFO","msg":"context3","ctx":{"func":"(func())(0x`)
 	casecheck.Contains(t, data, `"level":"INFO","msg":"context4","ctx":{"err":"er1"}`)
+	casecheck.Contains(t, data, `"level":"INFO","msg":"context5","ctx":{"obj":"logx_test.testData{A:\"\", B:0}"}`)
 }
 
 func TestUnit_NewString(t *testing.T) {
-	wg := syncing.NewGroup()
+	wg := syncing.NewGroup(context.TODO())
 	buff := newMockWriter()
 
 	l := logx.New()
@@ -94,10 +102,10 @@ func TestUnit_NewString(t *testing.T) {
 	l.SetLevel(logx.LevelDebug)
 	casecheck.Equal(t, logx.LevelDebug, l.GetLevel())
 
-	wg.Background(func() { l.Info("async", "id", 1) })
-	wg.Background(func() { l.Warn("async", "id", 2) })
-	wg.Background(func() { l.Error("async", "id", 3) })
-	wg.Background(func() { l.Debug("async", "id", 4) })
+	wg.Background("", func(_ context.Context) { l.Info("async", "id", 1) })
+	wg.Background("", func(_ context.Context) { l.Warn("async", "id", 2) })
+	wg.Background("", func(_ context.Context) { l.Error("async", "id", 3) })
+	wg.Background("", func(_ context.Context) { l.Debug("async", "id", 4) })
 
 	l.Info("sync", "id", 1)
 	l.Warn("sync", "id", 2)
@@ -108,6 +116,7 @@ func TestUnit_NewString(t *testing.T) {
 	l.Info("context2", "nil", nil)
 	l.Info("context3", "func", func() {})
 	l.Info("context4", "err", fmt.Errorf("er1"))
+	l.Info("context5", "obj", testData{})
 
 	wg.Wait()
 
@@ -124,10 +133,11 @@ func TestUnit_NewString(t *testing.T) {
 	casecheck.Contains(t, data, "\"level\"=\"INFO\"\t\"msg\"=\"context2\"\t\"nil\"=\"null\"")
 	casecheck.Contains(t, data, "\"level\"=\"INFO\"\t\"msg\"=\"context3\"\t\"func\"=\"(func())(0x")
 	casecheck.Contains(t, data, "\"level\"=\"INFO\"\t\"msg\"=\"context4\"\t\"err\"=\"er1\"")
+	casecheck.Contains(t, data, "\"level\"=\"INFO\"\t\"msg\"=\"context5\"\t\"obj\"=\"logx_test.testData{A:\"\", B:0}\"")
 }
 
 func TestUnit_NewSlog(t *testing.T) {
-	wg := syncing.NewGroup()
+	wg := syncing.NewGroup(context.TODO())
 	buff := newMockWriter()
 
 	l := logx.NewSLogJsonAdapter()
@@ -136,10 +146,10 @@ func TestUnit_NewSlog(t *testing.T) {
 	l.SetOutput(buff)
 	l.SetLevel(logx.LevelDebug)
 
-	wg.Background(func() { l.Info("async", "id", 1) })
-	wg.Background(func() { l.Warn("async", "id", 2) })
-	wg.Background(func() { l.Error("async", "id", 3) })
-	wg.Background(func() { l.Debug("async", "id", 4) })
+	wg.Background("", func(_ context.Context) { l.Info("async", "id", 1) })
+	wg.Background("", func(_ context.Context) { l.Warn("async", "id", 2) })
+	wg.Background("", func(_ context.Context) { l.Error("async", "id", 3) })
+	wg.Background("", func(_ context.Context) { l.Debug("async", "id", 4) })
 
 	l.Info("sync", "id", 1)
 	l.Warn("sync", "id", 2)
@@ -150,6 +160,7 @@ func TestUnit_NewSlog(t *testing.T) {
 	l.Info("context2", "nil", nil)
 	l.Info("context3", "func", func() {})
 	l.Info("context4", "err", fmt.Errorf("er1"))
+	l.Info("context5", "obj", testData{})
 
 	wg.Wait()
 
@@ -166,7 +177,23 @@ func TestUnit_NewSlog(t *testing.T) {
 	casecheck.Contains(t, data, "\"level\":\"INFO\",\"msg\":\"context2\",\"nil\":null")
 	casecheck.Contains(t, data, "\"level\":\"INFO\",\"msg\":\"context3\",\"func\":\"!ERROR:json: unsupported type: func()\"")
 	casecheck.Contains(t, data, "\"level\":\"INFO\",\"msg\":\"context4\",\"err\":\"er1\"")
+	casecheck.Contains(t, data, "\"level\":\"INFO\",\"msg\":\"context5\",\"obj\":{\"A\":\"\",\"B\":0}")
 }
+
+/*
+goos: linux
+goarch: amd64
+pkg: go.osspkg.com/logx
+cpu: 12th Gen Intel(R) Core(TM) i9-12900KF
+BenchmarkNewJSON
+BenchmarkNewJSON-24                 	  152106	      9702 ns/op	   66942 B/op	      13 allocs/op
+BenchmarkNewString
+BenchmarkNewString-24               	  130413	      9213 ns/op	   66085 B/op	      15 allocs/op
+BenchmarkNewSLogJsonAdapter
+BenchmarkNewSLogJsonAdapter-24      	 3046932	       484.7 ns/op	     201 B/op	       4 allocs/op
+BenchmarkNewSLogStringAdapter
+BenchmarkNewSLogStringAdapter-24    	 4683210	       308.7 ns/op	      96 B/op	       3 allocs/op
+*/
 
 func BenchmarkNewJSON(b *testing.B) {
 	ll := logx.New()
@@ -178,7 +205,7 @@ func BenchmarkNewJSON(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			ll.Info("sync", "id", 1)
+			ll.Info("sync", "id", 1, "obj", testData{})
 		}
 	})
 }
@@ -193,7 +220,7 @@ func BenchmarkNewString(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			ll.Info("sync", "id", 1)
+			ll.Info("sync", "id", 1, "obj", testData{})
 		}
 	})
 }
@@ -207,7 +234,7 @@ func BenchmarkNewSLogJsonAdapter(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			ll.Info("sync", "id", 1)
+			ll.Info("sync", "id", 1, "obj", testData{})
 		}
 	})
 }
@@ -221,7 +248,7 @@ func BenchmarkNewSLogStringAdapter(b *testing.B) {
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			ll.Info("sync", "id", 1)
+			ll.Info("sync", "id", 1, "obj", testData{})
 		}
 	})
 }
