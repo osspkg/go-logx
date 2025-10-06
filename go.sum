@@ -6,5 +6,5 @@ go.osspkg.com/casecheck v0.3.0 h1:x15blEszElbrHrEH5H02JIIhGIg/lGZzIt1kQlD3pwM=
 go.osspkg.com/casecheck v0.3.0/go.mod h1:TRFXDMFJEOtnlp3ET2Hix3osbxwPWhvaiT/HfD3+gBA=
 go.osspkg.com/ioutils v0.7.0 h1:FMQCD1X0tENdxa4cG9Fob++a8PnkgDMDuiN4EeXkCIc=
 go.osspkg.com/ioutils v0.7.0/go.mod h1:+W9rQK1Bmn4Wjs+bpC5x5DFoq48gq6WazytzoQsh/lE=
-go.osspkg.com/syncing v0.4.0 h1:9ytMfGHd6Ew69D2n/1syj0FTujNfb1KBiUSZ+KsMTqk=
-go.osspkg.com/syncing v0.4.0/go.mod h1:/LBmgCAHFW6nQgVDILpEuo6eRCFK1yyFeNbDs4eVNls=
+go.osspkg.com/syncing v0.4.2 h1:SXDmSv6nzPCDx91CWqalGrQS8tf+1GeQx5Mn+Jt75+c=
+go.osspkg.com/syncing v0.4.2/go.mod h1:/LBmgCAHFW6nQgVDILpEuo6eRCFK1yyFeNbDs4eVNls=
