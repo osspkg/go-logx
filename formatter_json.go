@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"io"
 
-	"go.osspkg.com/ioutils/data"
+	"go.osspkg.com/bb"
 	"go.osspkg.com/ioutils/pool"
 )
 
@@ -56,14 +56,14 @@ func (*FormatJSON) Encode(out io.Writer, m *Message) error {
 
 var poolJson = pool.New[*jsonWriter](func() *jsonWriter {
 	obj := &jsonWriter{
-		Buffer: data.NewBuffer(1024),
+		Buffer: bb.New(1024),
 	}
 	obj.Encoder = json.NewEncoder(obj.Buffer)
 	return obj
 })
 
 type jsonWriter struct {
-	Buffer  *data.Buffer
+	Buffer  *bb.Buffer
 	Encoder *json.Encoder
 }
 

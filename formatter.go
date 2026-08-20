@@ -8,14 +8,14 @@ package logx
 import (
 	"io"
 
-	"go.osspkg.com/ioutils/data"
+	"go.osspkg.com/bb"
 	"go.osspkg.com/ioutils/pool"
 )
 
 var newLine = []byte("\n")
 
-var poolBuffer = pool.New[*data.Buffer](func() *data.Buffer {
-	return data.NewBuffer(1024)
+var poolBuffer = pool.New[*bb.Buffer](func() *bb.Buffer {
+	return bb.New(1024)
 })
 
 type Formatter interface {
