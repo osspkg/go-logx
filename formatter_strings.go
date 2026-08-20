@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"go.osspkg.com/ioutils/data"
+	"go.osspkg.com/bb"
 )
 
 type FormatString struct {
@@ -27,7 +27,7 @@ func (v *FormatString) SetDelimiter(d byte) {
 	v.delim = d
 }
 
-func (v *FormatString) write(w *data.Buffer, key, value interface{}) {
+func (v *FormatString) write(w *bb.Buffer, key, value interface{}) {
 	w.WriteByte('"')             //nolint:errcheck
 	w.WriteString(typing(key))   //nolint:errcheck
 	w.WriteString("\"=\"")       //nolint:errcheck
@@ -38,9 +38,7 @@ func (v *FormatString) write(w *data.Buffer, key, value interface{}) {
 
 func (v *FormatString) Encode(out io.Writer, m *Message) error {
 	w := poolBuffer.Get()
-	defer func() {
-		poolBuffer.Put(w)
-	}()
+	defer poolBuffer.Put(w)
 
 	v.write(w, "time", m.Time.Format(time.RFC3339))
 	v.write(w, "level", m.Level)
@@ -56,6 +54,10 @@ func (v *FormatString) Encode(out io.Writer, m *Message) error {
 		}
 	}
 	w.Write(newLine) //nolint:errcheck
+
+	if _, err := w.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("logx string seek: %w", err)
+	}
 	if _, err := w.WriteTo(out); err != nil {
 		return fmt.Errorf("logx string write: %w", err)
 	}

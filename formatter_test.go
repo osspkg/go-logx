@@ -38,9 +38,9 @@ func TestUnit_FormatString_Encode(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var w bytes.Buffer
+			w := bytes.NewBuffer(nil)
 			fo := logx.NewFormatString()
-			err := fo.Encode(&w, tt.args)
+			err := fo.Encode(w, tt.args)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Encode() error = %v, wantErr %v", err, tt.wantErr)
 				return
