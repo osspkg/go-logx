@@ -9,23 +9,25 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sync/atomic"
+	"sync"
 	"time"
 )
 
 // Log base model
 type Log struct {
 	level     uint32
+	writeMu   sync.Mutex
 	writer    io.Writer
 	formatter Formatter
 }
 
-// New init new logger
-func New() *Log {
+// New creates a logger with the supplied configuration options.
+func New(options ...Option) *Log {
+	cfg := newLoggerConfig(LevelError, NewFormatJSON(), options)
 	return &Log{
-		level:     LevelError,
-		writer:    os.Stdout,
-		formatter: NewFormatJSON(),
+		level:     cfg.level,
+		writer:    cfg.writer,
+		formatter: cfg.formatter,
 	}
 }
 
@@ -47,61 +49,50 @@ func (l *Log) writeMessage(level uint32, call func(v *Message)) {
 	}
 	m.Level, m.Time = lvl, time.Now()
 
+	l.writeMu.Lock()
+	defer l.writeMu.Unlock()
+
 	err := l.formatter.Encode(l.writer, m)
 	if err != nil {
-		fmt.Println(err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 	}
 
 }
 
-// SetOutput change writer
-func (l *Log) SetOutput(out io.Writer) {
-	l.writer = out
-}
-
-func (l *Log) SetFormatter(f Formatter) {
-	l.formatter = f
-}
-
-// SetLevel change Log level
-func (l *Log) SetLevel(v uint32) {
-	atomic.StoreUint32(&l.level, v)
-}
-
-// GetLevel getting Log level
+// GetLevel returns the minimum level written by the logger.
 func (l *Log) GetLevel() uint32 {
-	return atomic.LoadUint32(&l.level)
+	return l.level
 }
 
-func (l *Log) Info(message string, args ...interface{}) {
+func (l *Log) Info(message string, args ...any) {
 	l.writeMessage(LevelInfo, func(v *Message) {
 		v.Message = message
 		v.Ctx = append(v.Ctx, args...)
 	})
 }
 
-func (l *Log) Warn(message string, args ...interface{}) {
+func (l *Log) Warn(message string, args ...any) {
 	l.writeMessage(LevelWarn, func(v *Message) {
 		v.Message = message
 		v.Ctx = append(v.Ctx, args...)
 	})
 }
 
-func (l *Log) Error(message string, args ...interface{}) {
+func (l *Log) Error(message string, args ...any) {
 	l.writeMessage(LevelError, func(v *Message) {
 		v.Message = message
 		v.Ctx = append(v.Ctx, args...)
 	})
 }
 
-func (l *Log) Debug(message string, args ...interface{}) {
+func (l *Log) Debug(message string, args ...any) {
 	l.writeMessage(LevelDebug, func(v *Message) {
 		v.Message = message
 		v.Ctx = append(v.Ctx, args...)
 	})
 }
 
-func (l *Log) Fatal(message string, args ...interface{}) {
+func (l *Log) Fatal(message string, args ...any) {
 	l.writeMessage(levelFatal, func(v *Message) {
 		v.Message = message
 		v.Ctx = append(v.Ctx, args...)

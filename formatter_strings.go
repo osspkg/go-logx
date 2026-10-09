@@ -9,62 +9,150 @@ import (
 	"encoding"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
-
-	"go.osspkg.com/bb"
 )
 
 type FormatString struct {
 	delim byte
 }
 
-func NewFormatString() *FormatString {
-	return &FormatString{delim: '\t'}
+// FormatStringOption configures a string formatter when it is created.
+type FormatStringOption func(*FormatString)
+
+// NewFormatString creates a key/value formatter. It separates fields with tabs
+// unless another delimiter is supplied.
+func NewFormatString(options ...FormatStringOption) *FormatString {
+	formatter := &FormatString{delim: '\t'}
+	for _, option := range options {
+		if option != nil {
+			option(formatter)
+		}
+	}
+	return formatter
 }
 
-func (v *FormatString) SetDelimiter(d byte) {
-	v.delim = d
+// WithDelimiter sets the separator used between formatted fields.
+func WithDelimiter(delimiter byte) FormatStringOption {
+	return func(formatter *FormatString) {
+		formatter.delim = delimiter
+	}
 }
 
-func (v *FormatString) write(w *bb.Buffer, key, value interface{}) {
-	w.WriteByte('"')             //nolint:errcheck
-	w.WriteString(typing(key))   //nolint:errcheck
-	w.WriteString("\"=\"")       //nolint:errcheck
-	w.WriteString(typing(value)) //nolint:errcheck
-	w.WriteByte('"')             //nolint:errcheck
-	w.WriteByte(v.delim)         //nolint:errcheck
+func (v *FormatString) write(w *pooledBuffer, key, value any) {
+	w.WriteByte('"') //nolint:errcheck
+	writeFormatValue(w, key)
+	w.WriteString("\"=\"") //nolint:errcheck
+	writeFormatValue(w, value)
+	w.WriteByte('"')     //nolint:errcheck
+	w.WriteByte(v.delim) //nolint:errcheck
+}
+
+func writeFormatValue(w *pooledBuffer, value any) {
+	if value == nil {
+		w.WriteString("null") //nolint:errcheck
+		return
+	}
+	switch v := value.(type) {
+	case error:
+		writeQuotedString(w, v.Error())
+	case fmt.GoStringer:
+		writeQuotedString(w, v.GoString())
+	case fmt.Stringer:
+		writeQuotedString(w, v.String())
+	case encoding.TextMarshaler:
+		if data, err := v.MarshalText(); err == nil {
+			writeQuotedString(w, string(data))
+		} else {
+			writeFallback(w, value)
+		}
+	case encoding.BinaryMarshaler:
+		if data, err := v.MarshalBinary(); err == nil {
+			writeQuotedString(w, string(data))
+		} else {
+			writeFallback(w, value)
+		}
+	case string:
+		writeQuotedString(w, v)
+	case bool:
+		w.Write(strconv.AppendBool(w.AvailableBuffer(), v)) //nolint:errcheck
+	case int:
+		w.Write(strconv.AppendInt(w.AvailableBuffer(), int64(v), 10)) //nolint:errcheck
+	case int8:
+		w.Write(strconv.AppendInt(w.AvailableBuffer(), int64(v), 10)) //nolint:errcheck
+	case int16:
+		w.Write(strconv.AppendInt(w.AvailableBuffer(), int64(v), 10)) //nolint:errcheck
+	case int32:
+		w.Write(strconv.AppendInt(w.AvailableBuffer(), int64(v), 10)) //nolint:errcheck
+	case int64:
+		w.Write(strconv.AppendInt(w.AvailableBuffer(), v, 10)) //nolint:errcheck
+	case uint:
+		w.Write(strconv.AppendUint(w.AvailableBuffer(), uint64(v), 10)) //nolint:errcheck
+	case uint8:
+		w.Write(strconv.AppendUint(w.AvailableBuffer(), uint64(v), 10)) //nolint:errcheck
+	case uint16:
+		w.Write(strconv.AppendUint(w.AvailableBuffer(), uint64(v), 10)) //nolint:errcheck
+	case uint32:
+		w.Write(strconv.AppendUint(w.AvailableBuffer(), uint64(v), 10)) //nolint:errcheck
+	case uint64:
+		w.Write(strconv.AppendUint(w.AvailableBuffer(), v, 10)) //nolint:errcheck
+	case uintptr:
+		w.Write(strconv.AppendUint(w.AvailableBuffer(), uint64(v), 10)) //nolint:errcheck
+	case float32:
+		w.Write(strconv.AppendFloat(w.AvailableBuffer(), float64(v), 'g', -1, 32)) //nolint:errcheck
+	case float64:
+		w.Write(strconv.AppendFloat(w.AvailableBuffer(), v, 'g', -1, 64)) //nolint:errcheck
+	case []byte:
+		writeQuotedString(w, string(v))
+	default:
+		writeFallback(w, value)
+	}
+}
+
+func writeQuotedString(w *pooledBuffer, value string) {
+	quoted := strconv.AppendQuote(w.AvailableBuffer(), value)
+	w.Write(quoted[1 : len(quoted)-1]) //nolint:errcheck
+}
+
+func writeFallback(w *pooledBuffer, value any) {
+	formatted := fmt.Sprintf("%#v", value)
+	w.WriteString(strings.Trim(formatted, "\"")) //nolint:errcheck
+}
+
+func (v *FormatString) writeTime(w *pooledBuffer, value time.Time) {
+	w.WriteString("\"time\"=\"")                                   //nolint:errcheck
+	w.Write(value.AppendFormat(w.AvailableBuffer(), time.RFC3339)) //nolint:errcheck
+	w.WriteByte('"')                                               //nolint:errcheck
+	w.WriteByte(v.delim)                                           //nolint:errcheck
 }
 
 func (v *FormatString) Encode(out io.Writer, m *Message) error {
 	w := poolBuffer.Get()
 	defer poolBuffer.Put(w)
 
-	v.write(w, "time", m.Time.Format(time.RFC3339))
+	v.writeTime(w, m.Time)
 	v.write(w, "level", m.Level)
 	v.write(w, "msg", m.Message)
 
 	if count := len(m.Ctx); count > 0 {
-		if count%2 != 0 {
-			m.Ctx = append(m.Ctx, nil)
-			count++
-		}
-		for i := 0; i < count; i = i + 2 {
-			v.write(w, m.Ctx[i], m.Ctx[i+1])
+		for i := 0; i < count; i += 2 {
+			var value any
+			if i+1 < count {
+				value = m.Ctx[i+1]
+			}
+			v.write(w, m.Ctx[i], value)
 		}
 	}
 	w.Write(newLine) //nolint:errcheck
 
-	if _, err := w.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("logx string seek: %w", err)
-	}
 	if _, err := w.WriteTo(out); err != nil {
 		return fmt.Errorf("logx string write: %w", err)
 	}
 	return nil
 }
 
-func typing(v interface{}) string {
+func typing(v any) string {
 	if v == nil {
 		return "null"
 	}

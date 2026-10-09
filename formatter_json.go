@@ -6,12 +6,12 @@
 package logx
 
 import (
-	"bytes"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"time"
 
-	"go.osspkg.com/bb"
+	"github.com/mailru/easyjson/jwriter"
 	"go.osspkg.com/ioutils/pool"
 )
 
@@ -21,52 +21,132 @@ func NewFormatJSON() *FormatJSON {
 	return &FormatJSON{}
 }
 
-func (*FormatJSON) Encode(out io.Writer, m *Message) error {
-	m.CtxToMap()
+type jsonContext struct {
+	values map[string]string
+}
 
-	w := poolJson.Get()
-	defer func() {
-		poolJson.Put(w)
-	}()
+const (
+	easyJSONInitialBufferSize = 128
+	easyJSONPoolMinBufferSize = 512
+)
 
-	if err := w.Encoder.Encode(m); err != nil {
-		return fmt.Errorf("logx json encode: %w", err)
+func (v *jsonContext) Reset() {
+	clear(v.values)
+}
+
+var poolJSONContext = pool.New[*jsonContext](func() *jsonContext {
+	return &jsonContext{values: make(map[string]string, 10)}
+})
+
+func prepareJSONMessage(message *Message) (Message, *jsonContext) {
+	encoded := *message
+	if len(message.Ctx) == 0 {
+		return encoded, nil
 	}
 
-	if _, err := w.Buffer.Seek(-1, io.SeekEnd); err != nil {
-		return fmt.Errorf("logx json seek: %w", err)
+	context := poolJSONContext.Get()
+	for key, value := range message.Map {
+		context.values[key] = value
 	}
-
-	if b := w.Buffer.Next(1); !bytes.Equal(b, newLine) {
-		if _, err := w.Buffer.Write(newLine); err != nil {
-			return fmt.Errorf("logx json write new line: %w", err)
+	for i := 0; i < len(message.Ctx); i += 2 {
+		var value any
+		if i+1 < len(message.Ctx) {
+			value = message.Ctx[i+1]
 		}
+		context.values[typing(message.Ctx[i])] = typing(value)
+	}
+	encoded.Map = context.values
+	return encoded, context
+}
+
+// encodeJSONMessage mirrors Message.MarshalEasyJSON while writing Time without
+// allocating the intermediate slice returned by time.Time.MarshalJSON.
+func encodeJSONMessage(out *jwriter.Writer, message Message) {
+	out.RawByte('{')
+	out.RawString(`"time":`)
+	writeJSONTime(out, message.Time)
+	if out.Error != nil {
+		return
+	}
+	out.RawString(`,"level":`)
+	out.String(message.Level)
+	out.RawString(`,"msg":`)
+	out.String(message.Message)
+	if len(message.Map) > 0 {
+		out.RawString(`,"ctx":{`)
+		first := true
+		for key, value := range message.Map {
+			if !first {
+				out.RawByte(',')
+			}
+			first = false
+			out.String(key)
+			out.RawByte(':')
+			out.String(value)
+		}
+		out.RawByte('}')
+	}
+	out.RawByte('}')
+}
+
+func writeJSONTime(out *jwriter.Writer, value time.Time) {
+	out.Buffer.EnsureSpace(37)
+	out.Buffer.Buf = append(out.Buffer.Buf, '"')
+	start := len(out.Buffer.Buf)
+	out.Buffer.Buf = value.AppendFormat(out.Buffer.Buf, time.RFC3339Nano)
+	out.Buffer.Buf = append(out.Buffer.Buf, '"')
+
+	if out.Buffer.Buf[start+4] != '-' {
+		out.Error = errors.New("Time.MarshalJSON: year outside of range [0,9999]")
+		return
+	}
+	_, offset := value.Zone()
+	if offset >= 24*60*60 || offset <= -24*60*60 {
+		out.Error = errors.New("Time.MarshalJSON: timezone hour outside of range [0,23]")
+	}
+}
+
+func dumpJSON(out io.Writer, writer *jwriter.Writer) error {
+	if writer.Buffer.Size() <= easyJSONInitialBufferSize && cap(writer.Buffer.Buf) < easyJSONPoolMinBufferSize {
+		data := writer.Buffer.BuildBytes()
+		n, err := out.Write(data)
+		if err != nil {
+			return err
+		}
+		if n != len(data) {
+			return io.ErrShortWrite
+		}
+		return nil
+	}
+	_, err := writer.DumpTo(out)
+	return err
+}
+
+func (*FormatJSON) Encode(out io.Writer, m *Message) error {
+	if m == nil {
+		return errors.New("logx json encode: nil message")
 	}
 
-	if _, err := w.Buffer.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("logx json seek: %w", err)
+	message, context := prepareJSONMessage(m)
+	if context != nil {
+		defer poolJSONContext.Put(context)
 	}
 
-	if _, err := w.Buffer.WriteTo(out); err != nil {
+	var w jwriter.Writer
+	encodeJSONMessage(&w, message)
+	if w.Error != nil {
+		encodeErr := w.Error
+		_, _ = w.DumpTo(io.Discard)
+		return fmt.Errorf("logx json encode: %w", encodeErr)
+	}
+
+	if err := dumpJSON(out, &w); err != nil {
 		return fmt.Errorf("logx json write: %w", err)
 	}
 
-	return nil
-}
-
-var poolJson = pool.New[*jsonWriter](func() *jsonWriter {
-	obj := &jsonWriter{
-		Buffer: bb.New(1024),
+	if _, err := out.Write(newLine); err != nil {
+		return fmt.Errorf("logx json write new line: %w", err)
 	}
-	obj.Encoder = json.NewEncoder(obj.Buffer)
-	return obj
-})
 
-type jsonWriter struct {
-	Buffer  *bb.Buffer
-	Encoder *json.Encoder
-}
-
-func (v *jsonWriter) Reset() {
-	v.Buffer.Reset()
+	return nil
 }

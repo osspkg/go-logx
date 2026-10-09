@@ -22,35 +22,40 @@ type Message struct {
 	Time    time.Time         `json:"time" yaml:"time"`
 	Level   string            `json:"level" yaml:"level"`
 	Message string            `json:"msg" yaml:"msg"`
-	Ctx     []interface{}     `json:"-"`
+	Ctx     []any             `json:"-"`
 	Map     map[string]string `json:"ctx,omitempty" yaml:"ctx,omitempty,inline"`
 }
 
 func newMessage() *Message {
 	return &Message{
-		Ctx: make([]interface{}, 0, 10),
+		Ctx: make([]any, 0, 10),
 		Map: make(map[string]string, 10),
 	}
 }
 
 func (v *Message) Reset() {
+	clear(v.Ctx)
+	clear(v.Map)
 	v.Ctx = v.Ctx[:0]
-	for k := range v.Map {
-		delete(v.Map, k)
-	}
 }
 
+// CtxToMap copies alternating context key/value pairs into Map and clears Ctx.
+// A missing value in the final pair is represented as nil.
 func (v *Message) CtxToMap() {
 	count := len(v.Ctx)
 	if count == 0 {
 		return
 	}
-	if count%2 != 0 {
-		v.Ctx = append(v.Ctx, nil)
-		count++
+	if v.Map == nil {
+		v.Map = make(map[string]string, count/2+1)
 	}
-	for i := 0; i < count; i = i + 2 {
-		v.Map[typing(v.Ctx[i])] = typing(v.Ctx[i+1])
+	for i := 0; i < count; i += 2 {
+		var value any
+		if i+1 < count {
+			value = v.Ctx[i+1]
+		}
+		v.Map[typing(v.Ctx[i])] = typing(value)
 	}
+	clear(v.Ctx)
 	v.Ctx = v.Ctx[:0]
 }

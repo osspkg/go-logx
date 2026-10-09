@@ -3,9 +3,8 @@
  *  Use of this source code is governed by a BSD 3-Clause license that can be found in the LICENSE file.
  */
 
+// Package logx provides leveled logging with JSON, text, and slog output.
 package logx
-
-import "io"
 
 const (
 	levelFatal uint32 = iota
@@ -25,13 +24,9 @@ var levels = map[uint32]string{
 
 // Logger base interface
 type Logger interface {
-	SetOutput(out io.Writer)
-	SetFormatter(f Formatter)
-	SetLevel(v uint32)
-
-	Fatal(message string, args ...interface{})
-	Error(message string, args ...interface{})
-	Warn(message string, args ...interface{})
-	Info(message string, args ...interface{})
-	Debug(message string, args ...interface{})
+	Fatal(message string, args ...any)
+	Error(message string, args ...any)
+	Warn(message string, args ...any)
+	Info(message string, args ...any)
+	Debug(message string, args ...any)
 }

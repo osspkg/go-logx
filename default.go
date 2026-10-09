@@ -5,33 +5,20 @@
 
 package logx
 
-import (
-	"io"
-)
-
 var std Logger = New()
 
+// SetDefault selects the logger used by the package-level functions. Call it
+// before starting concurrent logging.
 func SetDefault(log Logger) {
+	if log == nil {
+		return
+	}
 	std = log
 }
 
 // Default logger
 func Default() Logger {
 	return std
-}
-
-// SetOutput change writer
-func SetOutput(out io.Writer) {
-	std.SetOutput(out)
-}
-
-func SetFormatter(f Formatter) {
-	std.SetFormatter(f)
-}
-
-// SetLevel change Log level
-func SetLevel(v uint32) {
-	std.SetLevel(v)
 }
 
 // Info message

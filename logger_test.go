@@ -54,8 +54,9 @@ func TestUnit_NewJSON(t *testing.T) {
 	wg := syncing.NewGroup(context.TODO())
 	buff := newMockWriter()
 
-	logx.SetOutput(buff)
-	logx.SetLevel(logx.LevelDebug)
+	previous := logx.Default()
+	logx.SetDefault(logx.New(logx.WithOutput(buff), logx.WithLevel(logx.LevelDebug)))
+	defer logx.SetDefault(previous)
 
 	wg.Background("", func(_ context.Context) { logx.Info("async", "id", 1) })
 	wg.Background("", func(_ context.Context) { logx.Warn("async", "id", 2) })
@@ -95,11 +96,12 @@ func TestUnit_NewString(t *testing.T) {
 	wg := syncing.NewGroup(context.TODO())
 	buff := newMockWriter()
 
-	l := logx.New()
+	l := logx.New(
+		logx.WithFormatter(logx.NewFormatString()),
+		logx.WithOutput(buff),
+		logx.WithLevel(logx.LevelDebug),
+	)
 	casecheck.NotNil(t, l)
-	l.SetFormatter(logx.NewFormatString())
-	l.SetOutput(buff)
-	l.SetLevel(logx.LevelDebug)
 	casecheck.Equal(t, logx.LevelDebug, l.GetLevel())
 
 	wg.Background("", func(_ context.Context) { l.Info("async", "id", 1) })
@@ -140,11 +142,11 @@ func TestUnit_NewSlog(t *testing.T) {
 	wg := syncing.NewGroup(context.TODO())
 	buff := newMockWriter()
 
-	l := logx.NewSLogJsonAdapter()
+	l := logx.NewSLogJsonAdapter(
+		logx.WithOutput(buff),
+		logx.WithLevel(logx.LevelDebug),
+	)
 	casecheck.NotNil(t, l)
-	l.SetFormatter(logx.NewFormatString())
-	l.SetOutput(buff)
-	l.SetLevel(logx.LevelDebug)
 
 	wg.Background("", func(_ context.Context) { l.Info("async", "id", 1) })
 	wg.Background("", func(_ context.Context) { l.Warn("async", "id", 2) })
@@ -186,20 +188,21 @@ goarch: amd64
 pkg: go.osspkg.com/logx
 cpu: 12th Gen Intel(R) Core(TM) i9-12900KF
 BenchmarkNewJSON
-BenchmarkNewJSON-24                 	  152106	      9702 ns/op	   66942 B/op	      13 allocs/op
+BenchmarkNewJSON-24                 	 1088878	      1118 ns/op	     698 B/op	       8 allocs/op
 BenchmarkNewString
-BenchmarkNewString-24               	  130413	      9213 ns/op	   66085 B/op	      15 allocs/op
+BenchmarkNewString-24               	 2091469	       563.1 ns/op	      64 B/op	       3 allocs/op
 BenchmarkNewSLogJsonAdapter
-BenchmarkNewSLogJsonAdapter-24      	 3046932	       484.7 ns/op	     201 B/op	       4 allocs/op
+BenchmarkNewSLogJsonAdapter-24      	 6574744	       181.7 ns/op	      64 B/op	       1 allocs/op
 BenchmarkNewSLogStringAdapter
-BenchmarkNewSLogStringAdapter-24    	 4683210	       308.7 ns/op	      96 B/op	       3 allocs/op
+BenchmarkNewSLogStringAdapter-24    	 6761564	       170.3 ns/op	      72 B/op	       2 allocs/op
 */
 
 func BenchmarkNewJSON(b *testing.B) {
-	ll := logx.New()
-	ll.SetOutput(io.Discard)
-	ll.SetLevel(logx.LevelDebug)
-	ll.SetFormatter(logx.NewFormatJSON())
+	ll := logx.New(
+		logx.WithOutput(io.Discard),
+		logx.WithLevel(logx.LevelDebug),
+		logx.WithFormatter(logx.NewFormatJSON()),
+	)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -211,10 +214,11 @@ func BenchmarkNewJSON(b *testing.B) {
 }
 
 func BenchmarkNewString(b *testing.B) {
-	ll := logx.New()
-	ll.SetOutput(io.Discard)
-	ll.SetLevel(logx.LevelDebug)
-	ll.SetFormatter(logx.NewFormatString())
+	ll := logx.New(
+		logx.WithOutput(io.Discard),
+		logx.WithLevel(logx.LevelDebug),
+		logx.WithFormatter(logx.NewFormatString()),
+	)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -226,9 +230,7 @@ func BenchmarkNewString(b *testing.B) {
 }
 
 func BenchmarkNewSLogJsonAdapter(b *testing.B) {
-	ll := logx.NewSLogJsonAdapter()
-	ll.SetOutput(io.Discard)
-	ll.SetLevel(logx.LevelDebug)
+	ll := logx.NewSLogJsonAdapter(logx.WithOutput(io.Discard), logx.WithLevel(logx.LevelDebug))
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -240,9 +242,7 @@ func BenchmarkNewSLogJsonAdapter(b *testing.B) {
 }
 
 func BenchmarkNewSLogStringAdapter(b *testing.B) {
-	ll := logx.NewSLogStringAdapter()
-	ll.SetOutput(io.Discard)
-	ll.SetLevel(logx.LevelDebug)
+	ll := logx.NewSLogStringAdapter(logx.WithOutput(io.Discard), logx.WithLevel(logx.LevelDebug))
 
 	b.ReportAllocs()
 	b.ResetTimer()

@@ -28,7 +28,7 @@ func TestUnit_FormatString_Encode(t *testing.T) {
 				Time:    time.Now(),
 				Level:   "INF",
 				Message: "Hello",
-				Ctx: []interface{}{
+				Ctx: []any{
 					"err", "err\nmsg",
 				},
 			},
