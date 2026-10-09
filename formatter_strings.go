@@ -88,17 +88,17 @@ func writeFormatValue(w *pooledBuffer, value any) {
 	case int64:
 		w.Write(strconv.AppendInt(w.AvailableBuffer(), v, 10)) //nolint:errcheck
 	case uint:
-		w.Write(strconv.AppendUint(w.AvailableBuffer(), uint64(v), 10)) //nolint:errcheck
+		writeUintDecimal(w, uint64(v))
 	case uint8:
-		w.Write(strconv.AppendUint(w.AvailableBuffer(), uint64(v), 10)) //nolint:errcheck
+		writeUintDecimal(w, uint64(v))
 	case uint16:
-		w.Write(strconv.AppendUint(w.AvailableBuffer(), uint64(v), 10)) //nolint:errcheck
+		writeUintDecimal(w, uint64(v))
 	case uint32:
-		w.Write(strconv.AppendUint(w.AvailableBuffer(), uint64(v), 10)) //nolint:errcheck
+		writeUintDecimal(w, uint64(v))
 	case uint64:
-		w.Write(strconv.AppendUint(w.AvailableBuffer(), v, 10)) //nolint:errcheck
+		writeUintDecimal(w, v)
 	case uintptr:
-		w.Write(strconv.AppendUint(w.AvailableBuffer(), uint64(v), 10)) //nolint:errcheck
+		writeUintDecimal(w, uint64(v))
 	case float32:
 		w.Write(strconv.AppendFloat(w.AvailableBuffer(), float64(v), 'g', -1, 32)) //nolint:errcheck
 	case float64:
@@ -113,6 +113,10 @@ func writeFormatValue(w *pooledBuffer, value any) {
 func writeQuotedString(w *pooledBuffer, value string) {
 	quoted := strconv.AppendQuote(w.AvailableBuffer(), value)
 	w.Write(quoted[1 : len(quoted)-1]) //nolint:errcheck
+}
+
+func writeUintDecimal(w *pooledBuffer, value uint64) {
+	w.Write(strconv.AppendUint(w.AvailableBuffer(), value, 10)) //nolint:errcheck
 }
 
 func writeFallback(w *pooledBuffer, value any) {
@@ -176,6 +180,54 @@ func typing(v any) string {
 	default:
 	}
 
+	switch value := v.(type) {
+	case string:
+		if isPlainString(value) {
+			return value
+		}
+	case bool:
+		return strconv.FormatBool(value)
+	case int:
+		return strconv.FormatInt(int64(value), 10)
+	case int8:
+		return strconv.FormatInt(int64(value), 10)
+	case int16:
+		return strconv.FormatInt(int64(value), 10)
+	case int32:
+		return strconv.FormatInt(int64(value), 10)
+	case int64:
+		return strconv.FormatInt(value, 10)
+	case uint:
+		return strconv.FormatUint(uint64(value), 10)
+	case uint8:
+		return strconv.FormatUint(uint64(value), 10)
+	case uint16:
+		return strconv.FormatUint(uint64(value), 10)
+	case uint32:
+		return strconv.FormatUint(uint64(value), 10)
+	case uint64:
+		return strconv.FormatUint(value, 10)
+	case uintptr:
+		return strconv.FormatUint(uint64(value), 10)
+	case float32:
+		return strconv.FormatFloat(float64(value), 'g', -1, 32)
+	case float64:
+		return strconv.FormatFloat(value, 'g', -1, 64)
+	case complex64:
+		return strconv.FormatComplex(complex128(value), 'g', -1, 64)
+	case complex128:
+		return strconv.FormatComplex(value, 'g', -1, 128)
+	}
+
 	s := fmt.Sprintf("%#v", v)
 	return strings.Trim(s, "\"")
+}
+
+func isPlainString(value string) bool {
+	for i := 0; i < len(value); i++ {
+		if value[i] < 0x20 || value[i] > 0x7e || value[i] == '"' || value[i] == '\\' {
+			return false
+		}
+	}
+	return true
 }

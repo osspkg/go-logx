@@ -38,24 +38,3 @@ func (v *Message) Reset() {
 	clear(v.Map)
 	v.Ctx = v.Ctx[:0]
 }
-
-// CtxToMap copies alternating context key/value pairs into Map and clears Ctx.
-// A missing value in the final pair is represented as nil.
-func (v *Message) CtxToMap() {
-	count := len(v.Ctx)
-	if count == 0 {
-		return
-	}
-	if v.Map == nil {
-		v.Map = make(map[string]string, count/2+1)
-	}
-	for i := 0; i < count; i += 2 {
-		var value any
-		if i+1 < count {
-			value = v.Ctx[i+1]
-		}
-		v.Map[typing(v.Ctx[i])] = typing(value)
-	}
-	clear(v.Ctx)
-	v.Ctx = v.Ctx[:0]
-}
