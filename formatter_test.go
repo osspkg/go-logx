@@ -7,6 +7,9 @@ package logx_test
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +17,65 @@ import (
 
 	"go.osspkg.com/logx"
 )
+
+type testTextMarshaler []byte
+
+func (value testTextMarshaler) MarshalText() ([]byte, error) {
+	return value, nil
+}
+
+type testBinaryMarshaler []byte
+
+func (value testBinaryMarshaler) MarshalBinary() ([]byte, error) {
+	return value, nil
+}
+
+func TestFormatJSONEscapedContextValue(t *testing.T) {
+	cases := []struct {
+		name  string
+		value string
+	}{
+		{name: "quote", value: `quoted "text"`},
+		{name: "backslash", value: `path\to\file`},
+		{name: "newline", value: "first\nsecond"},
+		{name: "tab", value: "first\tsecond"},
+		{name: "unicode", value: "snowman ☃"},
+		{name: "backtick", value: "`quoted`"},
+		{name: "invalid utf8", value: string([]byte{'a', 0xff, 'b'})},
+	}
+
+	for _, tc := range cases {
+		values := []struct {
+			name  string
+			value any
+		}{
+			{name: "string", value: tc.value},
+			{name: "bytes", value: []byte(tc.value)},
+			{name: "text marshaler", value: testTextMarshaler([]byte(tc.value))},
+			{name: "binary marshaler", value: testBinaryMarshaler([]byte(tc.value))},
+		}
+		for _, item := range values {
+			t.Run(tc.name+"/"+item.name, func(t *testing.T) {
+				var output bytes.Buffer
+				message := &logx.Message{Ctx: []any{"payload", item.value}}
+				if err := logx.NewFormatJSON().Encode(&output, message); err != nil {
+					t.Fatal(err)
+				}
+
+				var decoded struct {
+					Ctx map[string]string `json:"ctx"`
+				}
+				if err := json.Unmarshal(output.Bytes(), &decoded); err != nil {
+					t.Fatal(err)
+				}
+				want := strings.Trim(fmt.Sprintf("%#v", tc.value), "\"")
+				if got := decoded.Ctx["payload"]; got != want {
+					t.Errorf("context value = %q, want %q", got, want)
+				}
+			})
+		}
+	}
+}
 
 func TestUnit_FormatString_Encode(t *testing.T) {
 	tests := []struct {

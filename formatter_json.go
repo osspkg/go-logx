@@ -6,6 +6,8 @@
 package logx
 
 import (
+	"bytes"
+	"encoding"
 	"errors"
 	"fmt"
 	"io"
@@ -177,6 +179,11 @@ func appendJSONTime(dst []byte, value time.Time) ([]byte, error) {
 // appendJSONString appends a quoted JSON string, copying safe runs at once.
 func appendJSONString(dst []byte, value string) []byte {
 	dst = append(dst, '"')
+	dst = appendJSONEscapedContent(dst, value)
+	return append(dst, '"')
+}
+
+func appendJSONEscapedContent(dst []byte, value string) []byte {
 	start := 0
 	for i := 0; i < len(value); {
 		char := value[i]
@@ -229,7 +236,18 @@ func appendJSONString(dst []byte, value string) []byte {
 	if start < len(value) {
 		dst = append(dst, value[start:]...)
 	}
-	return append(dst, '"')
+	return dst
+}
+
+// appendJSONTypedString preserves typingString's %#v representation without
+// allocating an intermediate string for escaped values.
+func appendJSONTypedString(dst []byte, value string) []byte {
+	if isPlainString(value) {
+		return appendJSONString(dst, value)
+	}
+	var scratch [128]byte
+	quoted := strconv.AppendQuote(scratch[:0], value)
+	return appendJSONString(dst, bytesStringView(bytes.Trim(quoted, "\"")))
 }
 
 // appendJSONContextValue keeps context values quoted while formatting primitives in place.
@@ -238,9 +256,7 @@ func appendJSONContextValue(dst []byte, value any) []byte {
 	case rawJSONContextValue:
 		return appendJSONString(dst, string(value))
 	case string:
-		if isPlainString(value) {
-			return appendJSONString(dst, value)
-		}
+		return appendJSONTypedString(dst, value)
 	case bool:
 		dst = append(dst, '"')
 		dst = strconv.AppendBool(dst, value)
@@ -310,6 +326,21 @@ func appendJSONContextValue(dst []byte, value any) []byte {
 			dst = append(dst, '"')
 			dst = append(dst, value...)
 			return append(dst, '"')
+		}
+		return appendJSONTypedString(dst, bytesStringView(value))
+	case error:
+		return appendJSONTypedString(dst, value.Error())
+	case fmt.GoStringer:
+		return appendJSONTypedString(dst, value.GoString())
+	case fmt.Stringer:
+		return appendJSONTypedString(dst, value.String())
+	case encoding.TextMarshaler:
+		if data, err := value.MarshalText(); err == nil {
+			return appendJSONTypedString(dst, bytesStringView(data))
+		}
+	case encoding.BinaryMarshaler:
+		if data, err := value.MarshalBinary(); err == nil {
+			return appendJSONTypedString(dst, bytesStringView(data))
 		}
 	}
 	return appendJSONString(dst, typing(value))
