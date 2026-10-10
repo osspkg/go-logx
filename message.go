@@ -26,7 +26,6 @@ type Message struct {
 func newMessage() *Message {
 	return &Message{
 		Ctx: make([]any, 0, 10),
-		Map: make(map[string]string, 10),
 	}
 }
 

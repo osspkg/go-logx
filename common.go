@@ -14,12 +14,13 @@ const (
 	LevelDebug
 )
 
-var levels = map[uint32]string{
-	levelFatal: "FATAL",
-	LevelError: "ERROR",
-	LevelWarn:  "WARN",
-	LevelInfo:  "INFO",
-	LevelDebug: "DEBUG",
+var levelNames = [...]string{"FATAL", "ERROR", "WARN", "INFO", "DEBUG"}
+
+func levelName(level uint32) string {
+	if level < uint32(len(levelNames)) {
+		return levelNames[level]
+	}
+	return "UNK"
 }
 
 // Logger base interface

@@ -34,7 +34,7 @@ func New(options ...Option) *Log {
 	return logger
 }
 
-func (l *Log) writeMessage(level uint32, call func(v *Message)) {
+func (l *Log) writeMessage(level uint32, message string, args []any) {
 	if l.GetLevel() < level {
 		return
 	}
@@ -44,13 +44,9 @@ func (l *Log) writeMessage(level uint32, call func(v *Message)) {
 		poolMessage.Put(m)
 	}()
 
-	call(m)
-
-	lvl, ok := levels[level]
-	if !ok {
-		lvl = "UNK"
-	}
-	m.Level, m.Time = lvl, time.Now()
+	m.Message = message
+	m.Ctx = append(m.Ctx, args...)
+	m.Level, m.Time = levelName(level), time.Now()
 
 	err := l.encodeAndWrite(m)
 	if err != nil {
@@ -87,37 +83,22 @@ func (l *Log) GetLevel() uint32 {
 }
 
 func (l *Log) Info(message string, args ...any) {
-	l.writeMessage(LevelInfo, func(v *Message) {
-		v.Message = message
-		v.Ctx = append(v.Ctx, args...)
-	})
+	l.writeMessage(LevelInfo, message, args)
 }
 
 func (l *Log) Warn(message string, args ...any) {
-	l.writeMessage(LevelWarn, func(v *Message) {
-		v.Message = message
-		v.Ctx = append(v.Ctx, args...)
-	})
+	l.writeMessage(LevelWarn, message, args)
 }
 
 func (l *Log) Error(message string, args ...any) {
-	l.writeMessage(LevelError, func(v *Message) {
-		v.Message = message
-		v.Ctx = append(v.Ctx, args...)
-	})
+	l.writeMessage(LevelError, message, args)
 }
 
 func (l *Log) Debug(message string, args ...any) {
-	l.writeMessage(LevelDebug, func(v *Message) {
-		v.Message = message
-		v.Ctx = append(v.Ctx, args...)
-	})
+	l.writeMessage(LevelDebug, message, args)
 }
 
 func (l *Log) Fatal(message string, args ...any) {
-	l.writeMessage(levelFatal, func(v *Message) {
-		v.Message = message
-		v.Ctx = append(v.Ctx, args...)
-	})
+	l.writeMessage(levelFatal, message, args)
 	os.Exit(1)
 }

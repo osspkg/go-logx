@@ -21,6 +21,7 @@ type adapterSlog struct {
 	formatter Formatter
 	log       *slog.Logger
 	writeMu   sync.Mutex
+	writeGate serializedWriter
 }
 
 // NewSLogJsonAdapter creates a slog adapter with JSON output.
@@ -44,6 +45,7 @@ func newSlogAdapter(newHandler func(io.Writer, *slog.HandlerOptions) slog.Handle
 		writer:    cfg.writer,
 		formatter: cfg.formatter,
 	}
+	adapter.writeGate = serializedWriter{mu: &adapter.writeMu, writer: adapter.writer}
 	if adapter.formatter == nil {
 		adapter.log = slog.New(newHandler(cfg.writer, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}
@@ -81,13 +83,9 @@ func (v *adapterSlog) writeMessage(level uint32, slogLevel slog.Level, force boo
 		return
 	}
 
-	lvl, ok := levels[level]
-	if !ok {
-		lvl = "UNK"
-	}
 	msg := poolMessage.Get()
 	defer poolMessage.Put(msg)
-	msg.Level, msg.Message, msg.Time = lvl, message, time.Now()
+	msg.Level, msg.Message, msg.Time = levelName(level), message, time.Now()
 	msg.Ctx = append(msg.Ctx, args...)
 
 	err := v.encode(msg)
@@ -97,6 +95,11 @@ func (v *adapterSlog) writeMessage(level uint32, slogLevel slog.Level, force boo
 }
 
 func (v *adapterSlog) encode(message *Message) error {
+	switch v.formatter.(type) {
+	case *FormatJSON, *FormatString:
+		return v.formatter.Encode(&v.writeGate, message)
+	}
+
 	v.writeMu.Lock()
 	defer v.writeMu.Unlock()
 	return v.formatter.Encode(v.writer, message)

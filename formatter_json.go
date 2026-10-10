@@ -77,6 +77,14 @@ func appendJSONMessage(dst []byte, message Message) ([]byte, error) {
 }
 
 func appendJSONMessageWithContext(dst []byte, message Message, context map[string]any) ([]byte, error) {
+	return appendJSONMessageFields(dst, message, context, nil)
+}
+
+func appendJSONMessageWithPairs(dst []byte, message Message, pairs []any) ([]byte, error) {
+	return appendJSONMessageFields(dst, message, nil, pairs)
+}
+
+func appendJSONMessageFields(dst []byte, message Message, context map[string]any, pairs []any) ([]byte, error) {
 	dst = append(dst, `{"time":`...)
 	var err error
 	dst, err = appendJSONTime(dst, message.Time)
@@ -87,20 +95,25 @@ func appendJSONMessageWithContext(dst []byte, message Message, context map[strin
 	dst = appendJSONString(dst, message.Level)
 	dst = append(dst, `,"msg":`...)
 	dst = appendJSONString(dst, message.Message)
-	if len(message.Map) > 0 || len(context) > 0 {
+	if pairs != nil || len(message.Map) > 0 || len(context) > 0 {
 		dst = append(dst, `,"ctx":{`...)
 		first := true
-		if context == nil {
-			for key, value := range message.Map {
+		switch {
+		case pairs != nil:
+			for i := 0; i < len(pairs); i += 2 {
 				if !first {
 					dst = append(dst, ',')
 				}
 				first = false
-				dst = appendJSONString(dst, key)
+				var value any
+				if i+1 < len(pairs) {
+					value = pairs[i+1]
+				}
+				dst = appendJSONString(dst, typing(pairs[i]))
 				dst = append(dst, ':')
-				dst = appendJSONString(dst, value)
+				dst = appendJSONContextValue(dst, value)
 			}
-		} else {
+		case context != nil:
 			for key, value := range context {
 				if !first {
 					dst = append(dst, ',')
@@ -110,10 +123,39 @@ func appendJSONMessageWithContext(dst []byte, message Message, context map[strin
 				dst = append(dst, ':')
 				dst = appendJSONContextValue(dst, value)
 			}
+		default:
+			for key, value := range message.Map {
+				if !first {
+					dst = append(dst, ',')
+				}
+				first = false
+				dst = appendJSONString(dst, key)
+				dst = append(dst, ':')
+				dst = appendJSONString(dst, value)
+			}
 		}
 		dst = append(dst, '}')
 	}
 	return append(dst, '}'), nil
+}
+
+// canAppendJSONPairs avoids building a temporary map for the common one and
+// two pair cases when string keys are unique and no map fields need merging.
+func canAppendJSONPairs(message *Message) bool {
+	if len(message.Map) != 0 {
+		return false
+	}
+	switch len(message.Ctx) {
+	case 2:
+		_, ok := message.Ctx[0].(string)
+		return ok
+	case 4:
+		first, firstOK := message.Ctx[0].(string)
+		second, secondOK := message.Ctx[2].(string)
+		return firstOK && secondOK && first != second
+	default:
+		return false
+	}
 }
 
 func appendJSONTime(dst []byte, value time.Time) ([]byte, error) {
@@ -287,7 +329,12 @@ func (*FormatJSON) Encode(out io.Writer, m *Message) error {
 		return errors.New("logx json encode: nil message")
 	}
 
-	message, context := prepareJSONMessage(m)
+	fastPairs := canAppendJSONPairs(m)
+	message := *m
+	var context *jsonContext
+	if !fastPairs {
+		message, context = prepareJSONMessage(m)
+	}
 	if context != nil {
 		defer poolJSONContext.Put(context)
 	}
@@ -303,7 +350,9 @@ func (*FormatJSON) Encode(out io.Writer, m *Message) error {
 
 	var encoded []byte
 	var err error
-	if context == nil {
+	if fastPairs {
+		encoded, err = appendJSONMessageWithPairs(buffer.data[:0], message, message.Ctx)
+	} else if context == nil {
 		encoded, err = appendJSONMessage(buffer.data[:0], message)
 	} else {
 		encoded, err = appendJSONMessageWithContext(buffer.data[:0], message, context.values)
