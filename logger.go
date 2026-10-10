@@ -18,17 +18,20 @@ type Log struct {
 	level     uint32
 	writeMu   sync.Mutex
 	writer    io.Writer
+	writeGate serializedWriter
 	formatter Formatter
 }
 
 // New creates a logger with the supplied configuration options.
 func New(options ...Option) *Log {
 	cfg := newLoggerConfig(LevelError, NewFormatJSON(), options)
-	return &Log{
+	logger := &Log{
 		level:     cfg.level,
 		writer:    cfg.writer,
 		formatter: cfg.formatter,
 	}
+	logger.writeGate = serializedWriter{mu: &logger.writeMu, writer: logger.writer}
+	return logger
 }
 
 func (l *Log) writeMessage(level uint32, call func(v *Message)) {
@@ -49,14 +52,33 @@ func (l *Log) writeMessage(level uint32, call func(v *Message)) {
 	}
 	m.Level, m.Time = lvl, time.Now()
 
-	l.writeMu.Lock()
-	defer l.writeMu.Unlock()
-
-	err := l.formatter.Encode(l.writer, m)
+	err := l.encodeAndWrite(m)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 	}
 
+}
+
+func (l *Log) encodeAndWrite(message *Message) error {
+	switch l.formatter.(type) {
+	case *FormatJSON, *FormatString:
+		return l.formatter.Encode(&l.writeGate, message)
+	default:
+		l.writeMu.Lock()
+		defer l.writeMu.Unlock()
+		return l.formatter.Encode(l.writer, message)
+	}
+}
+
+type serializedWriter struct {
+	mu     *sync.Mutex
+	writer io.Writer
+}
+
+func (w serializedWriter) Write(data []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.writer.Write(data)
 }
 
 // GetLevel returns the minimum level written by the logger.

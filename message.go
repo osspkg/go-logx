@@ -11,13 +11,10 @@ import (
 	"go.osspkg.com/ioutils/pool"
 )
 
-//go:generate easyjson
-
 var poolMessage = pool.New[*Message](func() *Message {
 	return newMessage()
 })
 
-//easyjson:json
 type Message struct {
 	Time    time.Time         `json:"time" yaml:"time"`
 	Level   string            `json:"level" yaml:"level"`
