@@ -8,6 +8,7 @@ package logx
 import (
 	"bytes"
 	"io"
+	"unsafe"
 
 	"go.osspkg.com/ioutils/pool"
 )
@@ -34,4 +35,14 @@ var poolBuffer = pool.New[*pooledBuffer](func() *pooledBuffer {
 
 type Formatter interface {
 	Encode(w io.Writer, m *Message) error
+}
+
+// bytesStringView creates a read-only string view over data. The returned
+// string must not outlive the synchronous formatting call, and data must not
+// be modified while the view is in use.
+func bytesStringView(data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+	return unsafe.String(unsafe.SliceData(data), len(data))
 }

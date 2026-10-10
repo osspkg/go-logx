@@ -76,20 +76,20 @@ func writeFormatValue(w *pooledBuffer, value any) {
 		writeQuotedString(w, v.String())
 	case encoding.TextMarshaler:
 		if data, err := v.MarshalText(); err == nil {
-			writeQuotedString(w, string(data))
+			writeQuotedString(w, bytesStringView(data))
 		} else {
 			writeFallback(w, value)
 		}
 	case encoding.BinaryMarshaler:
 		if data, err := v.MarshalBinary(); err == nil {
-			writeQuotedString(w, string(data))
+			writeQuotedString(w, bytesStringView(data))
 		} else {
 			writeFallback(w, value)
 		}
 	case string:
 		writeQuotedString(w, v)
 	case []byte:
-		writeQuotedString(w, string(v))
+		writeQuotedString(w, bytesStringView(v))
 	case complex64:
 		w.WriteString(strconv.FormatComplex(complex128(v), 'g', -1, 64)) //nolint:errcheck
 	case complex128:
@@ -213,14 +213,14 @@ func typing(v any) string {
 		return typingString(value.String())
 	case encoding.TextMarshaler:
 		if data, err := value.MarshalText(); err == nil {
-			return typingString(string(data))
+			return typingString(bytesStringView(data))
 		}
 	case encoding.BinaryMarshaler:
 		if data, err := value.MarshalBinary(); err == nil {
-			return typingString(string(data))
+			return typingString(bytesStringView(data))
 		}
 	case []byte:
-		return typingString(string(value))
+		return typingString(bytesStringView(value))
 	}
 
 	s := fmt.Sprintf("%#v", v)
