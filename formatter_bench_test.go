@@ -22,6 +22,36 @@ func BenchmarkFormatJSONEncode(b *testing.B) {
 	benchmarkFormatters(b, logx.NewFormatJSON())
 }
 
+func BenchmarkFormatJSONContextPairs(b *testing.B) {
+	cases := []struct {
+		name string
+		ctx  []any
+	}{
+		{name: "three", ctx: []any{"a", 1, "b", 2, "c", 3}},
+		{name: "four", ctx: []any{"a", 1, "b", 2, "c", 3, "d", 4}},
+		{name: "eight", ctx: []any{"a", 1, "b", 2, "c", 3, "d", 4, "e", 5, "f", 6, "g", 7, "h", 8}},
+		{name: "duplicate", ctx: []any{"a", 1, "b", 2, "a", 3}},
+	}
+	formatter := logx.NewFormatJSON()
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			message := logx.Message{
+				Time:  time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC),
+				Level: "INFO", Message: "sync", Ctx: tc.ctx,
+			}
+			b.ReportAllocs()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					if err := formatter.Encode(io.Discard, &message); err != nil {
+						b.Error(err)
+						return
+					}
+				}
+			})
+		})
+	}
+}
+
 func benchmarkFormatters(b *testing.B, formatter logx.Formatter) {
 	plain := "plain ascii payload"
 	escaped := "quote=\" slash=\\ newline=\n unicode=☃"

@@ -141,8 +141,7 @@ func appendJSONMessageFields(dst []byte, message Message, context map[string]any
 	return append(dst, '}'), nil
 }
 
-// canAppendJSONPairs avoids building a temporary map for the common one and
-// two pair cases when string keys are unique and no map fields need merging.
+// canAppendJSONPairs skips the temporary map when context keys cannot collide.
 func canAppendJSONPairs(message *Message) bool {
 	if len(message.Map) != 0 {
 		return false
@@ -156,7 +155,21 @@ func canAppendJSONPairs(message *Message) bool {
 		second, secondOK := message.Ctx[2].(string)
 		return firstOK && secondOK && first != second
 	default:
-		return false
+		if len(message.Ctx) < 6 || len(message.Ctx) > 16 || len(message.Ctx)%2 != 0 {
+			return false
+		}
+		for i := 0; i < len(message.Ctx); i += 2 {
+			key, ok := message.Ctx[i].(string)
+			if !ok || !isPlainString(key) {
+				return false
+			}
+			for j := 0; j < i; j += 2 {
+				if key == message.Ctx[j].(string) {
+					return false
+				}
+			}
+		}
+		return true
 	}
 }
 

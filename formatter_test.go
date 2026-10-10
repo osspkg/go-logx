@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -105,6 +106,68 @@ func TestFormatJSONFallbackContextValue(t *testing.T) {
 			}
 			if got := decoded.Ctx["payload"]; got != tc.want {
 				t.Errorf("context value = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFormatJSONContextPairs(t *testing.T) {
+	cases := []struct {
+		name    string
+		message logx.Message
+		want    map[string]string
+	}{
+		{
+			name:    "three unique keys",
+			message: logx.Message{Ctx: []any{"a", 1, "b", 2, "c", 3}},
+			want:    map[string]string{"a": "1", "b": "2", "c": "3"},
+		},
+		{
+			name:    "eight unique keys",
+			message: logx.Message{Ctx: []any{"a", 1, "b", 2, "c", 3, "d", 4, "e", 5, "f", 6, "g", 7, "h", 8}},
+			want:    map[string]string{"a": "1", "b": "2", "c": "3", "d": "4", "e": "5", "f": "6", "g": "7", "h": "8"},
+		},
+		{
+			name:    "duplicate key keeps last value",
+			message: logx.Message{Ctx: []any{"a", 1, "b", 2, "a", 3}},
+			want:    map[string]string{"a": "3", "b": "2"},
+		},
+		{
+			name:    "context overrides map",
+			message: logx.Message{Map: map[string]string{"a": "old", "b": "old"}, Ctx: []any{"a", "new", "c", 3, "d", 4}},
+			want:    map[string]string{"a": "new", "b": "old", "c": "3", "d": "4"},
+		},
+		{
+			name:    "non string key",
+			message: logx.Message{Ctx: []any{"a", 1, 7, 2, "c", 3}},
+			want:    map[string]string{"a": "1", "7": "2", "c": "3"},
+		},
+		{
+			name:    "escaped key",
+			message: logx.Message{Ctx: []any{"a", 1, "b\n", 2, "c", 3}},
+			want:    map[string]string{"a": "1", strings.Trim(fmt.Sprintf("%#v", "b\n"), "\""): "2", "c": "3"},
+		},
+		{
+			name:    "odd context length",
+			message: logx.Message{Ctx: []any{"a", 1, "b", 2, "c"}},
+			want:    map[string]string{"a": "1", "b": "2", "c": "null"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var output bytes.Buffer
+			if err := logx.NewFormatJSON().Encode(&output, &tc.message); err != nil {
+				t.Fatal(err)
+			}
+			var decoded struct {
+				Ctx map[string]string `json:"ctx"`
+			}
+			if err := json.Unmarshal(output.Bytes(), &decoded); err != nil {
+				t.Fatal(err)
+			}
+			if !maps.Equal(decoded.Ctx, tc.want) {
+				t.Errorf("context = %#v, want %#v", decoded.Ctx, tc.want)
 			}
 		})
 	}
