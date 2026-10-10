@@ -267,7 +267,10 @@ func appendJSONTypedString(dst []byte, value string) []byte {
 // formatting short structs does not allocate an intermediate string.
 func appendJSONFallback(dst []byte, value any) []byte {
 	var scratch [128]byte
-	formatted := fmt.Appendf(scratch[:0], "%#v", value)
+	formatted, ok := appendSimpleStruct(scratch[:0], value)
+	if !ok {
+		formatted = fmt.Appendf(scratch[:0], "%#v", value)
+	}
 	return appendJSONString(dst, bytesStringView(bytes.Trim(formatted, "\"")))
 }
 

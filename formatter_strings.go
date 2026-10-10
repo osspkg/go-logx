@@ -146,7 +146,10 @@ func appendScalarValue(dst []byte, value any) ([]byte, bool) {
 }
 
 func writeFallback(w *pooledBuffer, value any) {
-	formatted := fmt.Appendf(w.AvailableBuffer(), "%#v", value)
+	formatted, ok := appendSimpleStruct(w.AvailableBuffer(), value)
+	if !ok {
+		formatted = fmt.Appendf(w.AvailableBuffer(), "%#v", value)
+	}
 	start, end := 0, len(formatted)
 	for start < end && formatted[start] == '"' {
 		start++
