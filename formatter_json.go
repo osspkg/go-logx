@@ -255,12 +255,24 @@ func appendJSONEscapedContent(dst []byte, value string) []byte {
 // appendJSONTypedString preserves typingString's %#v representation without
 // allocating an intermediate string for escaped values.
 func appendJSONTypedString(dst []byte, value string) []byte {
-	if isPlainString(value) {
+	escapeHTML := false
+	for i := 0; i < len(value); i++ {
+		char := value[i]
+		if char < 0x20 || char > 0x7e || char == '"' || char == '\\' {
+			var scratch [128]byte
+			quoted := strconv.AppendQuote(scratch[:0], value)
+			return appendJSONString(dst, bytesStringView(bytes.Trim(quoted, "\"")))
+		}
+		if char == '<' || char == '>' || char == '&' {
+			escapeHTML = true
+		}
+	}
+	if escapeHTML {
 		return appendJSONString(dst, value)
 	}
-	var scratch [128]byte
-	quoted := strconv.AppendQuote(scratch[:0], value)
-	return appendJSONString(dst, bytesStringView(bytes.Trim(quoted, "\"")))
+	dst = append(dst, '"')
+	dst = append(dst, value...)
+	return append(dst, '"')
 }
 
 // appendJSONFallback formats uncommon values into a small local buffer so
