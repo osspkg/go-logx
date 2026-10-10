@@ -44,5 +44,5 @@ func bytesStringView(data []byte) string {
 	if len(data) == 0 {
 		return ""
 	}
-	return unsafe.String(unsafe.SliceData(data), len(data))
+	return unsafe.String(unsafe.SliceData(data), len(data)) //nolint:gosec
 }

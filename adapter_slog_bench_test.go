@@ -43,6 +43,7 @@ func BenchmarkSlogTextPaths(b *testing.B) {
 }
 
 // Keep dynamic dispatch in the comparison with the Logger return type.
+//
 //go:noinline
 func slogInfoAsInterface(logger *slog.Logger) interface{ Info(string, ...any) } {
 	return logger
