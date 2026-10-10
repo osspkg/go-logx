@@ -250,9 +250,19 @@ func appendJSONTypedString(dst []byte, value string) []byte {
 	return appendJSONString(dst, bytesStringView(bytes.Trim(quoted, "\"")))
 }
 
+// appendJSONFallback formats uncommon values into a small local buffer so
+// formatting short structs does not allocate an intermediate string.
+func appendJSONFallback(dst []byte, value any) []byte {
+	var scratch [128]byte
+	formatted := fmt.Appendf(scratch[:0], "%#v", value)
+	return appendJSONString(dst, bytesStringView(bytes.Trim(formatted, "\"")))
+}
+
 // appendJSONContextValue keeps context values quoted while formatting primitives in place.
 func appendJSONContextValue(dst []byte, value any) []byte {
 	switch value := value.(type) {
+	case nil:
+		return appendJSONString(dst, "null")
 	case rawJSONContextValue:
 		return appendJSONString(dst, string(value))
 	case string:
@@ -342,6 +352,8 @@ func appendJSONContextValue(dst []byte, value any) []byte {
 		if data, err := value.MarshalBinary(); err == nil {
 			return appendJSONTypedString(dst, bytesStringView(data))
 		}
+	default:
+		return appendJSONFallback(dst, value)
 	}
 	return appendJSONString(dst, typing(value))
 }

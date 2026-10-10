@@ -188,13 +188,13 @@ goarch: amd64
 pkg: go.osspkg.com/logx
 cpu: 12th Gen Intel(R) Core(TM) i9-12900KF
 BenchmarkNewJSON
-BenchmarkNewJSON-24                 	 7718502	       157.0 ns/op	      32 B/op	       1 allocs/op
+BenchmarkNewJSON-24                 	 8023093	       151.5 ns/op	       0 B/op	       0 allocs/op
 BenchmarkNewString
-BenchmarkNewString-24               	 7790144	       152.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkNewString-24               	 7889386	       152.0 ns/op	       0 B/op	       0 allocs/op
 BenchmarkNewSLogJsonAdapter
-BenchmarkNewSLogJsonAdapter-24      	 6556944	       167.3 ns/op	      64 B/op	       1 allocs/op
+BenchmarkNewSLogJsonAdapter-24      	 6909003	       178.3 ns/op	      64 B/op	       1 allocs/op
 BenchmarkNewSLogStringAdapter
-BenchmarkNewSLogStringAdapter-24    	 7074394	       175.2 ns/op	      72 B/op	       2 allocs/op
+BenchmarkNewSLogStringAdapter-24    	 7369856	       175.5 ns/op	      72 B/op	       2 allocs/op
 */
 
 func BenchmarkNewJSON(b *testing.B) {

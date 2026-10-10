@@ -77,6 +77,39 @@ func TestFormatJSONEscapedContextValue(t *testing.T) {
 	}
 }
 
+func TestFormatJSONFallbackContextValue(t *testing.T) {
+	value := struct {
+		Text string
+		ID   int
+	}{Text: "quoted \"text\"\n", ID: 7}
+	cases := []struct {
+		name  string
+		value any
+		want  string
+	}{
+		{name: "struct", value: value, want: strings.Trim(fmt.Sprintf("%#v", value), "\"")},
+		{name: "nil", value: nil, want: "null"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var output bytes.Buffer
+			if err := logx.NewFormatJSON().Encode(&output, &logx.Message{Ctx: []any{"payload", tc.value}}); err != nil {
+				t.Fatal(err)
+			}
+			var decoded struct {
+				Ctx map[string]string `json:"ctx"`
+			}
+			if err := json.Unmarshal(output.Bytes(), &decoded); err != nil {
+				t.Fatal(err)
+			}
+			if got := decoded.Ctx["payload"]; got != tc.want {
+				t.Errorf("context value = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestUnit_FormatString_Encode(t *testing.T) {
 	tests := []struct {
 		name    string
