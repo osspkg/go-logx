@@ -11,46 +11,26 @@ import (
 	"go.osspkg.com/ioutils/pool"
 )
 
-//go:generate easyjson
-
 var poolMessage = pool.New[*Message](func() *Message {
 	return newMessage()
 })
 
-//easyjson:json
 type Message struct {
 	Time    time.Time         `json:"time" yaml:"time"`
 	Level   string            `json:"level" yaml:"level"`
 	Message string            `json:"msg" yaml:"msg"`
-	Ctx     []interface{}     `json:"-"`
+	Ctx     []any             `json:"-"`
 	Map     map[string]string `json:"ctx,omitempty" yaml:"ctx,omitempty,inline"`
 }
 
 func newMessage() *Message {
 	return &Message{
-		Ctx: make([]interface{}, 0, 10),
-		Map: make(map[string]string, 10),
+		Ctx: make([]any, 0, 10),
 	}
 }
 
 func (v *Message) Reset() {
-	v.Ctx = v.Ctx[:0]
-	for k := range v.Map {
-		delete(v.Map, k)
-	}
-}
-
-func (v *Message) CtxToMap() {
-	count := len(v.Ctx)
-	if count == 0 {
-		return
-	}
-	if count%2 != 0 {
-		v.Ctx = append(v.Ctx, nil)
-		count++
-	}
-	for i := 0; i < count; i = i + 2 {
-		v.Map[typing(v.Ctx[i])] = typing(v.Ctx[i+1])
-	}
+	clear(v.Ctx)
+	clear(v.Map)
 	v.Ctx = v.Ctx[:0]
 }

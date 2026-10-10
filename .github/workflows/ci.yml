@@ -1,27 +1,43 @@
-
 name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  checks:
+    name: Checks (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+
     strategy:
+      fail-fast: false
       matrix:
-        go: [ '1.26' ]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v7
 
-      - name: Setup Go
-        uses: actions/setup-go@v3
+      - name: Set up Go
+        uses: actions/setup-go@v7
         with:
-          go-version: ${{ matrix.go }}
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
-      - name: Run CI
-        env:
-          COVERALLS_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+      - name: Run full CI checks
+        if: runner.os == 'Linux'
         run: make ci
+
+      - name: Run tests on macOS and Windows
+        if: runner.os != 'Linux'
+        run: go test ./...

@@ -9,27 +9,32 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sync/atomic"
+	"sync"
 	"time"
 )
 
 // Log base model
 type Log struct {
 	level     uint32
+	writeMu   sync.Mutex
 	writer    io.Writer
+	writeGate serializedWriter
 	formatter Formatter
 }
 
-// New init new logger
-func New() *Log {
-	return &Log{
-		level:     LevelError,
-		writer:    os.Stdout,
-		formatter: NewFormatJSON(),
+// New creates a logger with the supplied configuration options.
+func New(options ...Option) *Log {
+	cfg := newLoggerConfig(LevelError, NewFormatJSON(), options)
+	logger := &Log{
+		level:     cfg.level,
+		writer:    cfg.writer,
+		formatter: cfg.formatter,
 	}
+	logger.writeGate = serializedWriter{mu: &logger.writeMu, writer: logger.writer}
+	return logger
 }
 
-func (l *Log) writeMessage(level uint32, call func(v *Message)) {
+func (l *Log) writeMessage(level uint32, message string, args []any) {
 	if l.GetLevel() < level {
 		return
 	}
@@ -39,72 +44,61 @@ func (l *Log) writeMessage(level uint32, call func(v *Message)) {
 		poolMessage.Put(m)
 	}()
 
-	call(m)
+	m.Message = message
+	m.Ctx = append(m.Ctx, args...)
+	m.Level, m.Time = levelName(level), time.Now()
 
-	lvl, ok := levels[level]
-	if !ok {
-		lvl = "UNK"
-	}
-	m.Level, m.Time = lvl, time.Now()
-
-	err := l.formatter.Encode(l.writer, m)
+	err := l.encodeAndWrite(m)
 	if err != nil {
-		fmt.Println(err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 	}
 
 }
 
-// SetOutput change writer
-func (l *Log) SetOutput(out io.Writer) {
-	l.writer = out
+func (l *Log) encodeAndWrite(message *Message) error {
+	switch l.formatter.(type) {
+	case *FormatJSON, *FormatString:
+		return l.formatter.Encode(&l.writeGate, message)
+	default:
+		l.writeMu.Lock()
+		defer l.writeMu.Unlock()
+		return l.formatter.Encode(l.writer, message)
+	}
 }
 
-func (l *Log) SetFormatter(f Formatter) {
-	l.formatter = f
+type serializedWriter struct {
+	mu     *sync.Mutex
+	writer io.Writer
 }
 
-// SetLevel change Log level
-func (l *Log) SetLevel(v uint32) {
-	atomic.StoreUint32(&l.level, v)
+func (w serializedWriter) Write(data []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.writer.Write(data)
 }
 
-// GetLevel getting Log level
+// GetLevel returns the minimum level written by the logger.
 func (l *Log) GetLevel() uint32 {
-	return atomic.LoadUint32(&l.level)
+	return l.level
 }
 
-func (l *Log) Info(message string, args ...interface{}) {
-	l.writeMessage(LevelInfo, func(v *Message) {
-		v.Message = message
-		v.Ctx = append(v.Ctx, args...)
-	})
+func (l *Log) Info(message string, args ...any) {
+	l.writeMessage(LevelInfo, message, args)
 }
 
-func (l *Log) Warn(message string, args ...interface{}) {
-	l.writeMessage(LevelWarn, func(v *Message) {
-		v.Message = message
-		v.Ctx = append(v.Ctx, args...)
-	})
+func (l *Log) Warn(message string, args ...any) {
+	l.writeMessage(LevelWarn, message, args)
 }
 
-func (l *Log) Error(message string, args ...interface{}) {
-	l.writeMessage(LevelError, func(v *Message) {
-		v.Message = message
-		v.Ctx = append(v.Ctx, args...)
-	})
+func (l *Log) Error(message string, args ...any) {
+	l.writeMessage(LevelError, message, args)
 }
 
-func (l *Log) Debug(message string, args ...interface{}) {
-	l.writeMessage(LevelDebug, func(v *Message) {
-		v.Message = message
-		v.Ctx = append(v.Ctx, args...)
-	})
+func (l *Log) Debug(message string, args ...any) {
+	l.writeMessage(LevelDebug, message, args)
 }
 
-func (l *Log) Fatal(message string, args ...interface{}) {
-	l.writeMessage(levelFatal, func(v *Message) {
-		v.Message = message
-		v.Ctx = append(v.Ctx, args...)
-	})
+func (l *Log) Fatal(message string, args ...any) {
+	l.writeMessage(levelFatal, message, args)
 	os.Exit(1)
 }
